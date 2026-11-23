@@ -1,0 +1,55 @@
+name: Request Activation File
+
+# 在没有本机 Unity Hub 的情况下生成 .alf：
+# runner 下载 Linux 编辑器 → -createManualActivationFile → 上传 artifact。
+# 拿到 .alf 后在手机浏览器打开 https://license.unity3d.com/manual 换取 .ulf。
+
+on:
+  workflow_dispatch:
+
+env:
+  UNITY_VERSION: 6000.0.32f1
+  UNITY_CHANGESET: b2e806cf271c
+
+jobs:
+  request:
+    name: Request .alf
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Prepare disk
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /mnt/unity
+          sudo chown -R "$USER":"$USER" /mnt/unity
+          df -h /mnt
+
+      - name: Download editor
+        run: |
+          set -euo pipefail
+          cd /mnt/unity
+          curl -L --retry 3 --retry-delay 5 -o Unity.tar.xz \
+            "https://download.unity3d.com/download_unity/${UNITY_CHANGESET}/LinuxEditorInstaller/Unity-${UNITY_VERSION}.tar.xz"
+          ls -lh Unity.tar.xz
+
+      - name: Extract editor
+        run: |
+          set -euo pipefail
+          cd /mnt/unity
+          tar -xf Unity.tar.xz
+          ls -lh Editor/Unity
+
+      - name: Create activation file
+        run: |
+          set -euo pipefail
+          cd /mnt/unity
+          ./Editor/Unity -batchmode -nographics \
+            -createManualActivationFile -logFile - || true
+          ls -lh /mnt/unity/*.alf
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-activation-file
+          path: /mnt/unity/*.alf
+          if-no-files-found: error
