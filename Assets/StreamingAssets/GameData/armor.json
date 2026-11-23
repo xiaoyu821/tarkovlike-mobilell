@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "armor_paca",
+      "itemId": "item_armor_paca",
+      "protectionLevel": 2,
+      "durability": 40,
+      "coverage": ["chest"]
+    },
+    {
+      "id": "armor_plate_mk4",
+      "itemId": "item_armor_plate_mk4",
+      "protectionLevel": 4,
+      "durability": 60,
+      "coverage": ["chest"]
+    },
+    {
+      "id": "armor_helmet_k6",
+      "itemId": "item_helmet_k6",
+      "protectionLevel": 2,
+      "durability": 30,
+      "coverage": ["head"]
+    }
+  ]
+}

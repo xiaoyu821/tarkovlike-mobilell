@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "loot_jacket",
+      "containerType": "jacket",
+      "rolls": { "min": 1, "max": 3 },
+      "entries": [
+        { "itemId": "item_med_bandage", "weight": 20, "qty": { "min": 1, "max": 2 } },
+        { "itemId": "item_loot_bolts", "weight": 25, "qty": { "min": 1, "max": 1 } },
+        { "itemId": "item_loot_watch", "weight": 8, "qty": { "min": 1, "max": 1 } },
+        { "itemId": "item_loot_gold_chain", "weight": 2, "qty": { "min": 1, "max": 1 } }
+      ]
+    },
+    {
+      "id": "loot_weapon_crate",
+      "containerType": "weapon_crate",
+      "rolls": { "min": 1, "max": 2 },
+      "entries": [
+        { "itemId": "item_wpn_p9", "weight": 15, "qty": { "min": 1, "max": 1 } },
+        { "itemId": "item_wpn_wasp", "weight": 8, "qty": { "min": 1, "max": 1 } },
+        { "itemId": "item_ammo_545_bp", "weight": 20, "qty": { "min": 10, "max": 30 } },
+        { "itemId": "item_ammo_919_fmj", "weight": 25, "qty": { "min": 10, "max": 30 } },
+        { "itemId": "item_armor_paca", "weight": 10, "qty": { "min": 1, "max": 1 } }
+      ]
+    },
+    {
+      "id": "loot_scav_body",
+      "containerType": "scav_body",
+      "rolls": { "min": 2, "max": 4 },
+      "entries": [
+        { "itemId": "item_ammo_919_fmj", "weight": 30, "qty": { "min": 5, "max": 20 } },
+        { "itemId": "item_med_bandage", "weight": 20, "qty": { "min": 1, "max": 2 } },
+        { "itemId": "item_med_morphine", "weight": 6, "qty": { "min": 1, "max": 1 } },
+        { "itemId": "item_loot_watch", "weight": 10, "qty": { "min": 1, "max": 1 } },
+        { "itemId": "item_loot_bolts", "weight": 4, "qty": { "min": 1, "max": 1 } },
+        { "itemId": "item_wpn_p9", "weight": 3, "qty": { "min": 1, "max": 1 } }
+      ]
+    }
+  ]
+}

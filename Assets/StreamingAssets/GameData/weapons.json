@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "wpn_p9",
+      "itemId": "item_wpn_p9",
+      "caliber": "9x19",
+      "baseDamage": 34,
+      "damageMultiplier": 1.0,
+      "rpm": 180,
+      "magazineCapacity": 17,
+      "recoilCurve": {
+        "vertical": [0.8, 1.0, 1.2],
+        "horizontal": [0.3, 0.4, 0.5]
+      },
+      "attachmentSlots": ["muzzle", "magazine"],
+      "allowedAmmo": ["ammo_919_fmj", "ammo_919_ap"]
+    },
+    {
+      "id": "wpn_kestrel74",
+      "itemId": "item_wpn_kestrel74",
+      "caliber": "5.45x39",
+      "baseDamage": 38,
+      "damageMultiplier": 1.0,
+      "rpm": 650,
+      "magazineCapacity": 30,
+      "recoilCurve": {
+        "vertical": [1.0, 1.6, 2.1, 2.4, 2.6, 2.7],
+        "horizontal": [0.4, 0.6, 0.9, 1.1, 1.3, 1.4]
+      },
+      "attachmentSlots": ["optic", "muzzle", "grip", "magazine", "stock", "laser"],
+      "allowedAmmo": ["ammo_545_ps", "ammo_545_bp"]
+    },
+    {
+      "id": "wpn_viper",
+      "itemId": "item_wpn_viper",
+      "caliber": "5.45x39",
+      "baseDamage": 40,
+      "damageMultiplier": 1.05,
+      "rpm": 700,
+      "magazineCapacity": 30,
+      "recoilCurve": {
+        "vertical": [0.9, 1.4, 1.8, 2.2, 2.4, 2.5],
+        "horizontal": [0.5, 0.8, 1.0, 1.2, 1.4, 1.5]
+      },
+      "attachmentSlots": ["optic", "muzzle", "grip", "magazine", "stock", "laser"],
+      "allowedAmmo": ["ammo_545_ps", "ammo_545_bp"]
+    },
+    {
+      "id": "wpn_mule12",
+      "itemId": "item_wpn_mule12",
+      "caliber": "12ga",
+      "baseDamage": 88,
+      "damageMultiplier": 1.0,
+      "rpm": 90,
+      "magazineCapacity": 6,
+      "recoilCurve": {
+        "vertical": [3.0, 3.2, 3.4],
+        "horizontal": [1.0, 1.2, 1.3]
+      },
+      "attachmentSlots": ["optic", "stock"],
+      "allowedAmmo": ["ammo_12g_buck"]
+    },
+    {
+      "id": "wpn_wasp",
+      "itemId": "item_wpn_wasp",
+      "caliber": "9x19",
+      "baseDamage": 32,
+      "damageMultiplier": 0.95,
+      "rpm": 800,
+      "magazineCapacity": 30,
+      "recoilCurve": {
+        "vertical": [0.8, 1.2, 1.5, 1.7, 1.8],
+        "horizontal": [0.4, 0.7, 0.9, 1.1, 1.2]
+      },
+      "attachmentSlots": ["optic", "muzzle", "grip", "magazine", "laser"],
+      "allowedAmmo": ["ammo_919_fmj", "ammo_919_ap"]
+    }
+  ]
+}

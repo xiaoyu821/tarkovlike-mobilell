@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "ammo_545_ps",
+      "itemId": "item_ammo_545_ps",
+      "caliber": "5.45x39",
+      "damage": 38,
+      "penetration": 24,
+      "muzzleVelocity": 880,
+      "pellets": 1
+    },
+    {
+      "id": "ammo_545_bp",
+      "itemId": "item_ammo_545_bp",
+      "caliber": "5.45x39",
+      "damage": 34,
+      "penetration": 37,
+      "muzzleVelocity": 880,
+      "pellets": 1
+    },
+    {
+      "id": "ammo_919_fmj",
+      "itemId": "item_ammo_919_fmj",
+      "caliber": "9x19",
+      "damage": 34,
+      "penetration": 14,
+      "muzzleVelocity": 380,
+      "pellets": 1
+    },
+    {
+      "id": "ammo_919_ap",
+      "itemId": "item_ammo_919_ap",
+      "caliber": "9x19",
+      "damage": 28,
+      "penetration": 30,
+      "muzzleVelocity": 400,
+      "pellets": 1
+    },
+    {
+      "id": "ammo_12g_buck",
+      "itemId": "item_ammo_12g_buck",
+      "caliber": "12ga",
+      "damage": 11,
+      "penetration": 3,
+      "muzzleVelocity": 340,
+      "pellets": 8
+    }
+  ]
+}
