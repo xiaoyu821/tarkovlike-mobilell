@@ -21,8 +21,16 @@ public sealed class GameDataBootstrap : MonoBehaviour
     };
 
     private string _status = "正在加载数据…";
+    private GUIStyle _style;
+
+    public static GameDataBootstrap Instance { get; private set; }
 
     public DataCatalog Catalog { get; private set; }
+
+    private void Awake()
+    {
+        Instance = this;
+    }
 
     private IEnumerator Start()
     {
@@ -85,12 +93,20 @@ public sealed class GameDataBootstrap : MonoBehaviour
 
     private void OnGUI()
     {
-        var style = new GUIStyle(GUI.skin.label)
+        if (_style == null)
         {
-            fontSize = Mathf.Max(24, Screen.width / 40),
-            wordWrap = true
-        };
+            _style = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = Mathf.Max(20, Screen.height / 52),
+                wordWrap = true
+            };
+            _style.normal.textColor = Color.white;
+        }
 
-        GUI.Label(new Rect(24f, 24f, Screen.width - 48f, Screen.height - 48f), _status, style);
+        var box = new Rect(16f, 14f, Mathf.Min(Screen.width - 32f, 1200f), 96f);
+        GUI.color = new Color(0f, 0f, 0f, 0.45f);
+        GUI.DrawTexture(box, Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(box.x + 14f, box.y + 10f, box.width - 28f, box.height - 16f), _status, _style);
     }
 }
