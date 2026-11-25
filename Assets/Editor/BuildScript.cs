@@ -3,7 +3,6 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 /// <summary>
@@ -76,21 +75,9 @@ public static class BuildScript
 
     private static void EnsureScene()
     {
-        if (File.Exists(ScenePath))
+        if (!File.Exists(ScenePath))
         {
-            return;
+            throw new Exception("启动场景缺失: " + ScenePath);
         }
-
-        Directory.CreateDirectory("Assets/Scenes");
-
-        var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-        var bootstrap = new GameObject("Bootstrap");
-        bootstrap.AddComponent<GameDataBootstrap>();
-        bootstrap.AddComponent<M0Bootstrap>();
-
-        EditorSceneManager.SaveScene(scene, ScenePath);
-        AssetDatabase.Refresh();
-
-        Debug.Log("[Build] 已生成启动场景: " + ScenePath);
     }
 }
