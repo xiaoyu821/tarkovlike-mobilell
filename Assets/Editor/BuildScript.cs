@@ -6,7 +6,7 @@ using UnityEngine;
 
 /// <summary>
 /// CI 构建入口：Unity -batchmode -executeMethod BuildScript.BuildAndroid
-/// 若场景不存在，会自动生成一个空场景并挂上数据加载与 M0 白盒引导组件。
+/// 构建配置全部保存在提交的 ProjectSettings 中，运行时不再修改，避免构建中途触发资产重新导入。
 /// </summary>
 public static class BuildScript
 {
@@ -15,7 +15,6 @@ public static class BuildScript
 
     public static void BuildAndroid()
     {
-        ConfigurePlayerSettings();
         EnsureScene();
 
         var output = Environment.GetEnvironmentVariable("BUILD_OUTPUT");
@@ -28,11 +27,6 @@ public static class BuildScript
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
-        }
-
-        if (!EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android))
-        {
-            Debug.LogWarning("[Build] 切换到 Android 平台失败，继续尝试构建");
         }
 
         var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
@@ -52,18 +46,6 @@ public static class BuildScript
         {
             throw new Exception("Android 构建失败: " + summary.result);
         }
-    }
-
-    internal static void ConfigurePlayerSettings()
-    {
-        PlayerSettings.companyName = "xiaoyu";
-        PlayerSettings.productName = "TarkovLike M0";
-        PlayerSettings.bundleVersion = "0.1.0";
-        PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
-
-        PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.xiaoyu.tarkovlike");
-        PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
-        PlayerSettings.Android.bundleVersionCode = 1;
     }
 
     private static void EnsureScene()
