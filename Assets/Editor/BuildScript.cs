@@ -30,6 +30,11 @@ public static class BuildScript
             Directory.CreateDirectory(directory);
         }
 
+        if (!EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android))
+        {
+            Debug.LogWarning("[Build] 切换到 Android 平台失败，继续尝试构建");
+        }
+
         var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
         {
             scenes = new[] { ScenePath },
@@ -37,7 +42,6 @@ public static class BuildScript
             target = BuildTarget.Android,
             options = BuildOptions.None
         });
-
         var summary = report.summary;
         Debug.Log("[Build] result=" + summary.result +
                   " size=" + summary.totalSize +

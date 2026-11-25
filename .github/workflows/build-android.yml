@@ -81,6 +81,13 @@ jobs:
           allowDirtyBuild: true
 
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: generated-project-settings
+          path: ProjectSettings
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: build/Android
