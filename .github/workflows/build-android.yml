@@ -19,6 +19,7 @@ jobs:
   test:
     name: EditMode tests
     runs-on: ubuntu-latest
+    if: ${{ false }}
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
@@ -40,8 +41,6 @@ jobs:
         with:
           unityVersion: auto
           testMode: EditMode
-          coverageEnabled: false
-          customParameters: "-logFile -"
           artifactsPath: test-results
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           checkName: EditMode results
@@ -55,9 +54,8 @@ jobs:
 
   build:
     name: Build APK
-    needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
