@@ -52,7 +52,7 @@ public static class BuildScript
         }
     }
 
-    private static void ConfigurePlayerSettings()
+    internal static void ConfigurePlayerSettings()
     {
         PlayerSettings.companyName = "xiaoyu";
         PlayerSettings.productName = "TarkovLike M0";
@@ -60,8 +60,16 @@ public static class BuildScript
         PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
 
         PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.xiaoyu.tarkovlike");
-        PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
-        PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+        if (PlayerSettings.GetScriptingBackend(NamedBuildTarget.Android) != ScriptingImplementation.IL2CPP)
+        {
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+        }
+
+        if (PlayerSettings.Android.targetArchitectures != AndroidArchitecture.ARM64)
+        {
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+        }
+
         PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
         PlayerSettings.Android.bundleVersionCode = 1;
     }
