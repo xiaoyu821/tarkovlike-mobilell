@@ -40,6 +40,8 @@ jobs:
         with:
           unityVersion: auto
           testMode: EditMode
+          coverageEnabled: false
+          customParameters: "-logFile -"
           artifactsPath: test-results
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           checkName: EditMode results
