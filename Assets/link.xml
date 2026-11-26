@@ -8,4 +8,9 @@
   <assembly fullname="UnityEngine.PhysicsModule" preserve="all"/>
   <assembly fullname="UnityEngine.AudioModule" preserve="all"/>
   <assembly fullname="UnityEngine.ParticleSystemModule" preserve="all"/>
+  <!-- HUD 用 OnGUI + uGUI 文字，这两个模块在 release 包里容易被裁 -->
+  <assembly fullname="UnityEngine.IMGUIModule" preserve="all"/>
+  <assembly fullname="UnityEngine.TextRenderingModule" preserve="all"/>
+  <assembly fullname="UnityEngine.UIModule" preserve="all"/>
+  <assembly fullname="UnityEngine.UI" preserve="all"/>
 </linker>

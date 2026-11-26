@@ -56,8 +56,11 @@ public sealed class TouchControls : MonoBehaviour
 
     private static void EnsureEventSystem()
     {
-        if (Object.FindFirstObjectByType<EventSystem>() != null)
+        var existing = Object.FindFirstObjectByType<EventSystem>();
+        if (existing != null)
         {
+            // 默认阈值 10px：手指移动的前 10px 完全没反应，手机上就是"滑一下没动、再滑才动"。
+            existing.pixelDragThreshold = 1;
             return;
         }
 
@@ -67,6 +70,12 @@ public sealed class TouchControls : MonoBehaviour
 #else
         eventSystemGo.AddComponent<StandaloneInputModule>();
 #endif
+
+        var eventSystem = eventSystemGo.GetComponent<EventSystem>();
+        if (eventSystem != null)
+        {
+            eventSystem.pixelDragThreshold = 1;
+        }
     }
 
     private void Build(Transform root)
@@ -80,10 +89,10 @@ public sealed class TouchControls : MonoBehaviour
         _joystick.Initialize(moveArea, JoystickRadius, CircleSprite());
 
         _fire = CreateButton<HoldButton>(root, "FireButton", "开火",
-            new Vector2(-190f, 210f), 170f, new Color(0.85f, 0.2f, 0.2f, 0.55f));
+            new Vector2(-210f, 230f), 190f, new Color(0.85f, 0.2f, 0.2f, 0.5f));
 
         _interact = CreateButton<TapButton>(root, "InteractButton", "拿",
-            new Vector2(-190f, 420f), 120f, new Color(0.2f, 0.6f, 0.9f, 0.55f));
+            new Vector2(-210f, 450f), 130f, new Color(0.2f, 0.6f, 0.9f, 0.5f));
     }
 
     private static RectTransform CreateArea(string name, Transform root, Vector2 anchorMin, Vector2 anchorMax)
@@ -132,7 +141,7 @@ public sealed class TouchControls : MonoBehaviour
         text.text = label;
         text.alignment = TextAnchor.MiddleCenter;
         text.font = BuiltinFont();
-        text.fontSize = Mathf.RoundToInt(size * 0.32f);
+        text.fontSize = Mathf.RoundToInt(size * 0.3f);
         text.color = new Color(1f, 1f, 1f, 0.9f);
         text.raycastTarget = false;
 
@@ -174,13 +183,40 @@ public sealed class TouchControls : MonoBehaviour
         return _circleSprite;
     }
 
-    private sealed class LookPad : MonoBehaviour, IDragHandler
+    /// <summary>
+    /// 右半屏视角区。只让第一根手指驱动视角：
+    /// 之前没有绑定 pointerId，两根手指同时拖动时 delta 会叠加，视角直接飞出去。
+    /// </summary>
+    private sealed class LookPad : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
     {
         public TouchControls Owner;
 
+        private int _pointerId = -1;
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (_pointerId == -1)
+            {
+                _pointerId = eventData.pointerId;
+            }
+        }
+
         public void OnDrag(PointerEventData eventData)
         {
+            if (eventData.pointerId != _pointerId)
+            {
+                return;
+            }
+
             Owner.AddLook(eventData.delta);
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (eventData.pointerId == _pointerId)
+            {
+                _pointerId = -1;
+            }
         }
     }
 

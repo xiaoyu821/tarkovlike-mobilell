@@ -5,15 +5,27 @@ using UnityEngine;
 
 /// <summary>
 /// M0 第一人称训练角色：CharacterController 移动、相机视角、命中扫描射击、
-/// 弹药/换弹，以及靠近箱子时拾取。数值在数据加载完成后从 DataCatalog 读取。
+/// 弹药/换弹、后坐力回正、轻度辅助瞄准，以及靠近箱子时拾取。
+/// 数值在数据加载完成后从 DataCatalog 读取。
 /// </summary>
 public sealed class PlayerRig : MonoBehaviour
 {
-    private const float MoveSpeed = 4.5f;
+    private const float MoveSpeed = 4.6f;
     private const float Gravity = -22f;
-    private const float LookSensitivity = 0.12f;
-    private const float InteractRadius = 2.5f;
+    private const float LookSensitivity = 0.13f;
+    private const float InteractRadius = 2.6f;
     private const float ReloadSeconds = 1.6f;
+
+    // 后坐力：以前是直接改 _pitch，连发 30 发准星就永远朝天、必须手动压枪。
+    // 现在后坐力单独记在 _recoilPitch 上，停火后自动回正。
+    private const float RecoilRecoverDelay = 0.10f;
+    private const float RecoilRecoverSpeed = 95f;
+
+    // 辅助瞄准：只在开火瞬间把弹道往目标吸一点，不接管视角。
+    // 手机上没有鼠标，纯裸弹道命中率会低到劝退，这是手感的基础项。
+    private const float AimAssistDegrees = 2.5f;
+    private const float AimAssistStrength = 0.7f;
+    private const float AimAssistMaxDistance = 90f;
 
     private CharacterController _controller;
     private Transform _camera;
@@ -22,18 +34,24 @@ public sealed class PlayerRig : MonoBehaviour
     private AudioSource _audio;
     private AudioClip[] _shotClips;
     private AudioClip _clickClip;
+    private AudioClip _hitClip;
     private float _flashUntil;
     private float _hitMarkerUntil;
     private float _nextDryFireTime;
 
     private float _yaw;
     private float _pitch;
+    private float _recoilPitch;
+    private float _recoilYaw;
+    private float _recoilRecoverAt;
     private float _verticalSpeed;
     private Vector3 _spawnPosition;
     private float _groundY;
     private float _nextFireTime;
     private float _reloadEndTime;
     private float _tracerEndTime;
+    private Vector3 _tracerFrom;
+    private Vector3 _tracerTo;
     private float _damage = 25f;
     private float _rpm = 600f;
     private float _kick = 0.5f;
@@ -43,6 +61,8 @@ public sealed class PlayerRig : MonoBehaviour
     private bool _reloading;
     private bool _weaponLoaded;
     private string _weaponName = "训练武器";
+
+    private static Material _tracerMaterial;
 
     public event Action<string> Message;
 
@@ -57,11 +77,23 @@ public sealed class PlayerRig : MonoBehaviour
     public float GroundY => _groundY;
     public Vector3 CameraPosition => _camera != null ? _camera.position : Vector3.zero;
 
+    // 曳光弹：LineRenderer 材质拿不到时（内置 shader 被裁），退回 HUD 画 2D 线。
+    public bool TracerVisible => Time.time < _tracerEndTime && _tracerFrom != Vector3.zero;
+    public bool HudTracer => _tracer == null;
+    public Vector3 TracerFrom => _tracerFrom;
+    public Vector3 TracerTo => _tracerTo;
+
     public void Initialize(TouchControls controls)
     {
         _controls = controls;
         _controller = GetComponent<CharacterController>();
-        _camera = GetComponentInChildren<Camera>().transform;
+
+        var childCamera = GetComponentInChildren<Camera>();
+        if (childCamera != null)
+        {
+            _camera = childCamera.transform;
+        }
+
         _yaw = transform.eulerAngles.y;
         _spawnPosition = transform.position;
         _groundY = _spawnPosition.y;
@@ -79,6 +111,7 @@ public sealed class PlayerRig : MonoBehaviour
             return;
         }
 
+        UpdateRecoilRecovery();
         UpdateLook();
         UpdateMovement();
         UpdateReload();
@@ -99,7 +132,27 @@ public sealed class PlayerRig : MonoBehaviour
         _pitch = Mathf.Clamp(_pitch - look.y, -85f, 85f);
 
         transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
-        _camera.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
+
+        if (_camera != null)
+        {
+            // 后坐力叠加在视角之上，而不是改写 _pitch，这样松手就能自己回正。
+            _camera.localRotation = Quaternion.Euler(
+                Mathf.Clamp(_pitch - _recoilPitch, -89f, 89f),
+                _recoilYaw,
+                0f);
+        }
+    }
+
+    private void UpdateRecoilRecovery()
+    {
+        if (Time.time < _recoilRecoverAt)
+        {
+            return;
+        }
+
+        var dt = Mathf.Min(Time.deltaTime, 0.05f);
+        _recoilPitch = Mathf.MoveTowards(_recoilPitch, 0f, RecoilRecoverSpeed * dt);
+        _recoilYaw = Mathf.MoveTowards(_recoilYaw, 0f, RecoilRecoverSpeed * 0.7f * dt);
     }
 
     private void UpdateMovement()
@@ -125,7 +178,6 @@ public sealed class PlayerRig : MonoBehaviour
         _controller.Move(velocity * dt);
 
         // 硬约束：白盒地面是平的，无论物理为何没挡住，都不允许沉到地面以下。
-        // （如果这里一直在触发，说明 CC 根本没和地面碰撞，需要在 HUD 上看 ray 数据）
         if (transform.position.y < _groundY - 0.02f)
         {
             SnapToGround();
@@ -174,6 +226,7 @@ public sealed class PlayerRig : MonoBehaviour
         {
             _reloading = false;
             _magazine = _magazineSize;
+            _nextFireTime = Time.time; // 换完立刻能打，不要多等一个射击间隔
         }
     }
 
@@ -207,42 +260,125 @@ public sealed class PlayerRig : MonoBehaviour
 
     private void Shoot()
     {
-        var origin = _camera.position + _camera.forward * 0.5f;
-        var endPoint = origin + _camera.forward * 100f;
+        if (_camera == null)
+        {
+            return;
+        }
+
+        var forward = _camera.forward;
+        var origin = _camera.position + forward * 0.5f;
 
         var hitAnyTarget = false;
+        var endPoint = origin + forward * 100f;
+
         for (var i = 0; i < _pellets; i++)
         {
-            var direction = ApplySpread(_camera.forward, i > 0 ? 2.5f : 0.4f);
-            if (Physics.Raycast(origin, direction, out var hit, 200f))
+            var direction = ApplySpread(forward, i > 0 ? 2.5f : 0.4f);
+            direction = ApplyAimAssist(origin, direction);
+
+            var pelletEnd = origin + direction * 120f;
+            if (Physics.Raycast(origin, direction, out var hit, 200f, ~0, QueryTriggerInteraction.Ignore))
             {
-                endPoint = hit.point;
+                pelletEnd = hit.point;
                 var target = hit.collider.GetComponentInParent<TargetDummy>();
-                if (target != null)
+                if (target != null && target.TakeDamage(_damage))
                 {
-                    target.TakeDamage(_damage);
                     hitAnyTarget = true;
                 }
             }
+
+            if (i == _pellets - 1)
+            {
+                endPoint = pelletEnd;
+            }
         }
 
-        _tracer.SetPosition(0, origin);
-        _tracer.SetPosition(1, endPoint);
-        _tracer.enabled = true;
-        _tracerEndTime = Time.time + 0.05f;
+        // 曳光弹从"枪管"射出而不是从眼睛射出，视觉上才像在开枪。
+        var barrel = _camera.position + forward * 0.55f + _camera.right * 0.17f - _camera.up * 0.16f;
+        _tracerFrom = barrel;
+        _tracerTo = endPoint;
+        _tracerEndTime = Time.time + 0.06f;
 
-        _pitch = Mathf.Clamp(_pitch - _kick, -85f, 85f);
+        if (_tracer != null)
+        {
+            _tracer.SetPosition(0, barrel);
+            _tracer.SetPosition(1, endPoint);
+            _tracer.enabled = true;
+        }
 
-        _flashUntil = Time.time + 0.045f;
+        // 后坐力：竖直为主 + 一点随机水平，停火后自动回正
+        _recoilPitch += _kick * 0.55f;
+        _recoilYaw += UnityEngine.Random.Range(-1f, 1f) * _kick * 0.22f;
+        _recoilRecoverAt = Time.time + RecoilRecoverDelay;
+
+        _flashUntil = Time.time + 0.05f;
+
         if (hitAnyTarget)
         {
-            _hitMarkerUntil = Time.time + 0.09f;
+            _hitMarkerUntil = Time.time + 0.12f;
+            if (_audio != null && _hitClip != null) _audio.PlayOneShot(_hitClip, 0.38f);
         }
 
         if (_audio != null && _shotClips != null && _shotClips.Length > 0)
         {
             _audio.PlayOneShot(_shotClips[UnityEngine.Random.Range(0, _shotClips.Length)], 0.6f);
         }
+    }
+
+    /// <summary>
+    /// 把弹道往准星附近的目标吸一点点。只做方向微调，不接管玩家视角；
+    /// 中间有墙挡着就不吸（否则会往墙里打）。
+    /// </summary>
+    private Vector3 ApplyAimAssist(Vector3 origin, Vector3 direction)
+    {
+        var candidates = TargetDummy.Active;
+        if (candidates.Count == 0)
+        {
+            return direction;
+        }
+
+        var minDot = Mathf.Cos(AimAssistDegrees * Mathf.Deg2Rad);
+        TargetDummy best = null;
+        var bestDot = minDot;
+
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            var candidate = candidates[i];
+            if (candidate == null || !candidate.IsAlive)
+            {
+                continue;
+            }
+
+            var toTarget = candidate.AimPoint - origin;
+            var distance = toTarget.magnitude;
+            if (distance < 1.5f || distance > AimAssistMaxDistance)
+            {
+                continue;
+            }
+
+            var dot = Vector3.Dot(direction, toTarget / distance);
+            if (dot <= bestDot)
+            {
+                continue;
+            }
+
+            if (Physics.Linecast(origin, candidate.AimPoint, out var blocker, ~0, QueryTriggerInteraction.Ignore) &&
+                blocker.collider.GetComponentInParent<TargetDummy>() == null)
+            {
+                continue; // 被掩体挡住，不吸
+            }
+
+            best = candidate;
+            bestDot = dot;
+        }
+
+        if (best == null)
+        {
+            return direction;
+        }
+
+        var aim = (best.AimPoint - origin).normalized;
+        return Vector3.Slerp(direction, aim, AimAssistStrength).normalized;
     }
 
     private Vector3 ApplySpread(Vector3 forward, float degrees)
@@ -365,11 +501,11 @@ public sealed class PlayerRig : MonoBehaviour
             BuildShotClip(37, 101f)
         };
         _clickClip = BuildClickClip();
+        _hitClip = BuildHitClip();
     }
 
     /// <summary>
     /// 程序化枪声：瞬态爆点 + 中频主体 + 低频冲击 + 房间尾巴。
-    /// 之前只有"一段噪声 + 指数衰减"，听起来像放气，所以重写了这套四段式。
     /// </summary>
     private static AudioClip BuildShotClip(int seed, float thumpHz)
     {
@@ -434,25 +570,98 @@ public sealed class PlayerRig : MonoBehaviour
         return clip;
     }
 
+    /// <summary>命中反馈音：短促金属"叮"。手机上没这个音，打中了也不敢确定。</summary>
+    private static AudioClip BuildHitClip()
+    {
+        const int rate = 44100;
+        const float duration = 0.11f;
+        var count = Mathf.CeilToInt(rate * duration);
+        var data = new float[count];
+        var rng = new System.Random(101);
+
+        for (var i = 0; i < count; i++)
+        {
+            var t = i / (float)rate;
+            var noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            var a = Mathf.Sin(2f * Mathf.PI * 1480f * t) * Mathf.Exp(-t * 38f);
+            var b = Mathf.Sin(2f * Mathf.PI * 2260f * t) * Mathf.Exp(-t * 55f) * 0.55f;
+            var click = noise * Mathf.Exp(-t * 220f) * 0.35f;
+
+            data[i] = Mathf.Clamp((a + b + click) * 0.5f, -1f, 1f);
+        }
+
+        var clip = AudioClip.Create("m0_hit", count, 1, rate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
+    /// <summary>
+    /// 曳光弹用 LineRenderer，材质 shader 按常见顺序回退。
+    /// 之前没有判空：一旦 Shader.Find 返回 null，Shoot() 里就会每发抛异常，开火直接卡死。
+    /// </summary>
     private void CreateTracer()
     {
+        var material = TracerMaterial();
+        if (material == null)
+        {
+            // 拿不到 shader 就不建 LineRenderer，HUD 会用 2D 线兜底
+            _tracer = null;
+            return;
+        }
+
         var tracerGo = new GameObject("Tracer");
         tracerGo.transform.SetParent(transform, false);
 
         _tracer = tracerGo.AddComponent<LineRenderer>();
         _tracer.positionCount = 2;
-        _tracer.startWidth = 0.025f;
-        _tracer.endWidth = 0.025f;
+        _tracer.startWidth = 0.03f;
+        _tracer.endWidth = 0.012f;
         _tracer.useWorldSpace = true;
-        _tracer.material = new Material(Shader.Find("Sprites/Default"));
-        _tracer.startColor = new Color(1f, 0.85f, 0.3f, 0.9f);
-        _tracer.endColor = new Color(1f, 0.85f, 0.3f, 0.1f);
+        _tracer.numCapVertices = 0;
+        _tracer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _tracer.receiveShadows = false;
+        _tracer.material = material;
+        _tracer.startColor = new Color(1f, 0.88f, 0.42f, 1f);
+        _tracer.endColor = new Color(1f, 0.72f, 0.25f, 0.15f);
         _tracer.enabled = false;
+    }
+
+    private static Material TracerMaterial()
+    {
+        if (_tracerMaterial != null)
+        {
+            return _tracerMaterial;
+        }
+
+        var candidates = new[]
+        {
+            "Sprites/Default",
+            "Unlit/Color",
+            "Legacy Shaders/Particles/Additive",
+            "Hidden/Internal-Colored",
+            "Standard"
+        };
+
+        for (var i = 0; i < candidates.Length; i++)
+        {
+            var shader = Shader.Find(candidates[i]);
+            if (shader == null)
+            {
+                continue;
+            }
+
+            var material = new Material(shader) { color = Color.white };
+            _tracerMaterial = material;
+            return material;
+        }
+
+        return null;
     }
 
     private void UpdateTracer()
     {
-        if (_tracer.enabled && Time.time >= _tracerEndTime)
+        if (_tracer != null && _tracer.enabled && Time.time >= _tracerEndTime)
         {
             _tracer.enabled = false;
         }

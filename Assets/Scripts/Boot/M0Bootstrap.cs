@@ -24,6 +24,9 @@ public sealed class M0Bootstrap : MonoBehaviour
     private GUIStyle _hudStyle;
     private GUIStyle _toastStyle;
     private float _startTime;
+    private float _diagUntil;
+    private float _diagSuspendUntil;
+    private bool _diagVisible;
 
     private void Awake()
     {
@@ -31,6 +34,7 @@ public sealed class M0Bootstrap : MonoBehaviour
         Application.targetFrameRate = 60;
         QualitySettings.vSyncCount = 0;
         _startTime = Time.time;
+        _diagUntil = Time.time + 12f;
 
         // 关键：工程里 ProjectSettings/DynamicsManager 的 m_AutoSyncTransforms = 0。
         // 这种情况下用 transform.position 摆好物体后，物理世界里的碰撞体还停在旧位置，
@@ -235,8 +239,26 @@ public sealed class M0Bootstrap : MonoBehaviour
 
     private void Update()
     {
-        if (Time.time < _nextDiag) return;
-        _nextDiag = Time.time + 0.5f;
+        var now = Time.time;
+
+        // 诊断块默认只在前 12 秒露个脸，之后收起，别一直挡着屏幕。
+        // 一旦角色真的沉到地面以下（穿地复现），自动弹出来 8 秒。
+        if (_player != null && now - _startTime > 3f &&
+            _player.transform.position.y < _player.GroundY - 0.25f)
+        {
+            _diagSuspendUntil = Mathf.Max(_diagSuspendUntil, now + 8f);
+        }
+
+        _diagVisible = now < _diagUntil || now < _diagSuspendUntil;
+
+        if (!_diagVisible)
+        {
+            _diag = "";
+            return;
+        }
+
+        if (now < _nextDiag) return;
+        _nextDiag = now + 0.5f;
         _diag = BuildDiagnostics();
     }
 
@@ -310,49 +332,104 @@ public sealed class M0Bootstrap : MonoBehaviour
     {
         if (_player == null) return;
 
-        // 枪口闪光：中心偏下的六芒星，50ms 内衰减。
-        // 之前是一整块半透明矩形，看起来像 UI 挡住屏幕，不像枪口。
+        var width = Screen.width;
+        var height = Screen.height;
+
+        // 曳光弹兜底：LineRenderer 的材质 shader 拿不到时，用 2D 线画。
+        if (_player.HudTracer && _player.TracerVisible && _playerCamera != null)
+        {
+            DrawScreenTracer(_player.TracerFrom, _player.TracerTo);
+        }
+
+        // 枪口闪光：准星下方的星形。尺寸按屏幕高度算 —— 之前写死像素，
+        // 在高分屏上是一大块糊在脸前，在低分屏上又看不见。
         if (_player.MuzzleFlashActive)
         {
             var t = _player.MuzzleFlash01;
-            var cx = Screen.width * 0.5f;
-            var cy = Screen.height * 0.58f; // 枪口在准星下方，别糊在准星上
-            var len = Mathf.Lerp(10f, 62f, t);
-            var core = Mathf.Lerp(6f, 26f, t);
+            var cx = width * 0.5f;
+            var cy = height * 0.60f; // 枪口在准星下方，别糊在准星上
+            var len = Mathf.Lerp(height * 0.012f, height * 0.055f, t);
+            var core = Mathf.Lerp(height * 0.006f, height * 0.02f, t);
+            var jitter = Mathf.Sin(Time.time * 110f) * 7f;
 
             var saved = GUI.matrix;
-            GUI.color = new Color(1f, 0.82f, 0.45f, 0.55f * t);
+
+            // 4 长 2 短，比均匀六芒星更像枪口焰
             for (var i = 0; i < 6; i++)
             {
-                GUIUtility.RotateAroundPivot(i * 60f + 15f, new Vector2(cx, cy));
-                GUI.DrawTexture(new Rect(cx - 1.5f, cy - len, 3f, len + 6f), Texture2D.whiteTexture);
+                var armLength = i % 3 == 0 ? len * 1.35f : len * 0.8f;
+                GUIUtility.RotateAroundPivot(i * 60f + 12f + jitter, new Vector2(cx, cy));
+                GUI.color = new Color(1f, 0.82f, 0.45f, 0.5f * t);
+                GUI.DrawTexture(new Rect(cx - 1.5f, cy - armLength, 3f, armLength + 5f), Texture2D.whiteTexture);
             }
+
             GUI.matrix = saved;
 
-            GUI.color = new Color(1f, 0.97f, 0.86f, 0.75f * t);
+            GUI.color = new Color(1f, 0.97f, 0.86f, 0.7f * t);
             GUI.DrawTexture(new Rect(cx - core * 0.5f, cy - core * 0.5f, core, core), Texture2D.whiteTexture);
             GUI.color = Color.white;
         }
 
-        // 命中标记：中心一个 X
+        // 命中标记：中心一个 X（两条实线，之前是 8 段小方块拼出来的虚线）
         if (_player.HitMarkerActive)
         {
-            var cx = Screen.width * 0.5f;
-            var cy = Screen.height * 0.5f;
-            var len = 14f;
-            var thickness = 2f;
-            GUI.color = new Color(1f, 0.3f, 0.25f, 0.95f);
+            var cx = width * 0.5f;
+            var cy = height * 0.5f;
+            var len = Mathf.Max(16f, height * 0.022f);
+            var saved = GUI.matrix;
 
-            // 用几段小矩形拼一个 X（避免依赖贴图）
-            for (var i = 0; i < 8; i++)
-            {
-                var t = i / 8f;
-                var x = cx - len + t * len * 2f;
-                GUI.DrawTexture(new Rect(x, cy - len + t * len * 2f, thickness, thickness), Texture2D.whiteTexture);
-                GUI.DrawTexture(new Rect(x, cy + len - t * len * 2f, thickness, thickness), Texture2D.whiteTexture);
-            }
+            GUI.color = new Color(1f, 0.32f, 0.26f, 0.95f);
+            GUIUtility.RotateAroundPivot(45f, new Vector2(cx, cy));
+            GUI.DrawTexture(new Rect(cx - 1.5f, cy - len, 3f, len * 2f), Texture2D.whiteTexture);
+            GUIUtility.RotateAroundPivot(-90f, new Vector2(cx, cy));
+            GUI.DrawTexture(new Rect(cx - 1.5f, cy - len, 3f, len * 2f), Texture2D.whiteTexture);
+
+            GUI.matrix = saved;
             GUI.color = Color.white;
         }
+    }
+
+    /// <summary>把世界坐标的曳光段投影到屏幕上，分 10 段拼一条带透视的线。</summary>
+    private void DrawScreenTracer(Vector3 from, Vector3 to)
+    {
+        if (_playerCamera == null) return;
+
+        var a = _playerCamera.WorldToScreenPoint(from);
+        var b = _playerCamera.WorldToScreenPoint(to);
+        if (a.z <= 0f || b.z <= 0f) return;
+
+        // GUI 的 y 轴向下，而屏幕坐标向上
+        var ax = a.x;
+        var ay = Screen.height - a.y;
+        var bx = b.x;
+        var by = Screen.height - b.y;
+
+        const int segments = 10;
+        var thickness = Mathf.Max(2f, Screen.height * 0.0035f);
+
+        for (var i = 0; i < segments; i++)
+        {
+            var t0 = i / (float)segments;
+            var t1 = (i + 1) / (float)segments;
+            var x0 = Mathf.Lerp(ax, bx, t0);
+            var y0 = Mathf.Lerp(ay, by, t0);
+            var x1 = Mathf.Lerp(ax, bx, t1);
+            var y1 = Mathf.Lerp(ay, by, t1);
+
+            var length = Vector2.Distance(new Vector2(x0, y0), new Vector2(x1, y1));
+            if (length < 0.5f) continue;
+
+            var angle = Mathf.Atan2(y1 - y0, x1 - x0) * Mathf.Rad2Deg;
+            var saved = GUI.matrix;
+
+            GUIUtility.RotateAroundPivot(angle, new Vector2(x0, y0));
+            GUI.color = new Color(1f, 0.86f, 0.4f, Mathf.Lerp(0.9f, 0.1f, t0));
+            GUI.DrawTexture(new Rect(x0, y0 - thickness * 0.5f, length, thickness), Texture2D.whiteTexture);
+
+            GUI.matrix = saved;
+        }
+
+        GUI.color = Color.white;
     }
 
     private static void DrawCrosshair()
@@ -385,8 +462,14 @@ public sealed class M0Bootstrap : MonoBehaviour
         GUI.Label(new Rect(Screen.width - 520f, 16f, 500f, 48f),
             "M0 训练场 · " + _player.WeaponName, _hudStyle);
 
-        // 诊断块：掉下去的时候这几行能直接告诉我们发生了什么
-        GUI.Label(new Rect(16f, Screen.height - 300f, 900f, 150f), _diag, _toastStyle);
+        // 诊断块：默认 12 秒后收起（别一直挡屏幕），穿地时自动弹出 8 秒
+        if (_diagVisible && !string.IsNullOrEmpty(_diag))
+        {
+            GUI.Label(new Rect(16f, Screen.height - 300f, 900f, 150f), _diag, _toastStyle);
+        }
+
+        GUI.Label(new Rect(16f, 12f, 260f, 40f),
+            string.Format("{0:0} FPS", 1f / Mathf.Max(0.0001f, Time.smoothDeltaTime)), _toastStyle);
 
         if (Time.time - _startTime < 15f)
         {
