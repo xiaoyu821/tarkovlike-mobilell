@@ -172,6 +172,8 @@ public sealed class M0Bootstrap : MonoBehaviour
         go.transform.localScale = new Vector3(0.8f, 0.9f, 0.8f);
         go.GetComponent<Renderer>().sharedMaterial = material;
 
+        EnsureCollider<CapsuleCollider>(go);
+
         var dummy = go.AddComponent<TargetDummy>();
         dummy.Initialize(100);
     }
@@ -185,6 +187,7 @@ public sealed class M0Bootstrap : MonoBehaviour
         go.transform.localScale = new Vector3(1.2f, 1.2f, 1.2f);
         go.GetComponent<Renderer>().sharedMaterial = material;
 
+        EnsureCollider<BoxCollider>(go);
         go.AddComponent<LootCrate>().Initialize(tableId);
     }
 
@@ -196,7 +199,22 @@ public sealed class M0Bootstrap : MonoBehaviour
         go.transform.position = position;
         go.transform.localScale = scale;
         go.GetComponent<Renderer>().sharedMaterial = material;
+
+        // CreatePrimitive 的 Collider 是引擎内部 AddComponent 的，
+        // IL2CPP 链接器可能把 BoxCollider 裁掉（实测：HUD 显示 col=none，然后角色穿地）。
+        // 这里显式再要一次，托管代码里出现类型名，链接器就不会删。
+        EnsureCollider<BoxCollider>(go);
         return go;
+    }
+
+    private static T EnsureCollider<T>(GameObject go) where T : Collider
+    {
+        var collider = go.GetComponent<T>();
+        if (collider == null)
+        {
+            collider = go.AddComponent<T>();
+        }
+        return collider;
     }
 
     private static Material CreateMaterial(Color color)
@@ -259,6 +277,7 @@ public sealed class M0Bootstrap : MonoBehaviour
     {
         EnsureStyles();
         DrawCrosshair();
+        DrawWeaponFeedback();
         DrawHud();
         DrawToasts();
     }
@@ -284,6 +303,45 @@ public sealed class M0Bootstrap : MonoBehaviour
                 alignment = TextAnchor.MiddleCenter
             };
             _toastStyle.normal.textColor = new Color(1f, 0.9f, 0.6f, 0.95f);
+        }
+    }
+
+    private void DrawWeaponFeedback()
+    {
+        if (_player == null) return;
+
+        // 枪口闪光：屏幕下半部一团暖色，0.045s
+        if (_player.MuzzleFlashActive)
+        {
+            var w = Screen.width * 0.22f;
+            var h = Screen.height * 0.16f;
+            GUI.color = new Color(1f, 0.85f, 0.45f, 0.35f);
+            GUI.DrawTexture(new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height - h * 1.1f, w, h),
+                Texture2D.whiteTexture);
+            GUI.color = new Color(1f, 0.95f, 0.75f, 0.5f);
+            GUI.DrawTexture(new Rect(Screen.width * 0.5f - w * 0.2f, Screen.height - h * 0.85f, w * 0.4f, h * 0.45f),
+                Texture2D.whiteTexture);
+            GUI.color = Color.white;
+        }
+
+        // 命中标记：中心一个 X
+        if (_player.HitMarkerActive)
+        {
+            var cx = Screen.width * 0.5f;
+            var cy = Screen.height * 0.5f;
+            var len = 14f;
+            var thickness = 2f;
+            GUI.color = new Color(1f, 0.3f, 0.25f, 0.95f);
+
+            // 用几段小矩形拼一个 X（避免依赖贴图）
+            for (var i = 0; i < 8; i++)
+            {
+                var t = i / 8f;
+                var x = cx - len + t * len * 2f;
+                GUI.DrawTexture(new Rect(x, cy - len + t * len * 2f, thickness, thickness), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(x, cy + len - t * len * 2f, thickness, thickness), Texture2D.whiteTexture);
+            }
+            GUI.color = Color.white;
         }
     }
 

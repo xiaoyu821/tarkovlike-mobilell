@@ -19,6 +19,12 @@ public sealed class PlayerRig : MonoBehaviour
     private Transform _camera;
     private TouchControls _controls;
     private LineRenderer _tracer;
+    private AudioSource _audio;
+    private AudioClip _shotClip;
+    private AudioClip _clickClip;
+    private float _flashUntil;
+    private float _hitMarkerUntil;
+    private float _nextDryFireTime;
 
     private float _yaw;
     private float _pitch;
@@ -45,6 +51,8 @@ public sealed class PlayerRig : MonoBehaviour
     public int MagazineSize => _magazineSize;
     public bool Reloading => _reloading;
     public bool Grounded => _controller != null && _controller.isGrounded;
+    public bool MuzzleFlashActive => Time.time < _flashUntil;
+    public bool HitMarkerActive => Time.time < _hitMarkerUntil;
     public float GroundY => _groundY;
     public Vector3 CameraPosition => _camera != null ? _camera.position : Vector3.zero;
 
@@ -59,6 +67,7 @@ public sealed class PlayerRig : MonoBehaviour
         Physics.SyncTransforms();
         _magazine = _magazineSize;
         CreateTracer();
+        SetupAudio();
         TryLoadWeapon();
     }
 
@@ -169,8 +178,19 @@ public sealed class PlayerRig : MonoBehaviour
 
     private void UpdateFire()
     {
-        if (!_controls.FireHeld || _reloading || _magazine <= 0 || Time.time < _nextFireTime)
+        if (!_controls.FireHeld || _reloading || Time.time < _nextFireTime)
         {
+            return;
+        }
+
+        if (_magazine <= 0)
+        {
+            // 空仓要有声音，否则玩家不知道是没子弹还是没点中
+            if (Time.time >= _nextDryFireTime)
+            {
+                _nextDryFireTime = Time.time + 0.35f;
+                if (_audio != null && _clickClip != null) _audio.PlayOneShot(_clickClip, 0.5f);
+            }
             return;
         }
 
@@ -189,6 +209,7 @@ public sealed class PlayerRig : MonoBehaviour
         var origin = _camera.position + _camera.forward * 0.5f;
         var endPoint = origin + _camera.forward * 100f;
 
+        var hitAnyTarget = false;
         for (var i = 0; i < _pellets; i++)
         {
             var direction = ApplySpread(_camera.forward, i > 0 ? 2.5f : 0.4f);
@@ -199,6 +220,7 @@ public sealed class PlayerRig : MonoBehaviour
                 if (target != null)
                 {
                     target.TakeDamage(_damage);
+                    hitAnyTarget = true;
                 }
             }
         }
@@ -209,6 +231,18 @@ public sealed class PlayerRig : MonoBehaviour
         _tracerEndTime = Time.time + 0.05f;
 
         _pitch = Mathf.Clamp(_pitch - _kick, -85f, 85f);
+
+        _flashUntil = Time.time + 0.045f;
+        if (hitAnyTarget)
+        {
+            _hitMarkerUntil = Time.time + 0.09f;
+        }
+
+        if (_audio != null && _shotClip != null)
+        {
+            _audio.pitch = UnityEngine.Random.Range(0.94f, 1.06f);
+            _audio.PlayOneShot(_shotClip, 0.85f);
+        }
     }
 
     private Vector3 ApplySpread(Vector3 forward, float degrees)
@@ -314,6 +348,62 @@ public sealed class PlayerRig : MonoBehaviour
 
         _weaponLoaded = true;
         Message?.Invoke("装备 " + _weaponName + " · " + _magazineSize + " 发");
+    }
+
+    private void SetupAudio()
+    {
+        _audio = gameObject.AddComponent<AudioSource>();
+        _audio.playOnAwake = false;
+        _audio.spatialBlend = 0f;
+        _audio.volume = 1f;
+        _shotClip = BuildShotClip();
+        _clickClip = BuildClickClip();
+    }
+
+    /// <summary>
+    /// 程序化合成枪声：没有音频资源也能有反馈。
+    /// 噪声 + 低频冲击 + 指数衰减，比"完全静音"强一百倍。
+    /// </summary>
+    private static AudioClip BuildShotClip()
+    {
+        const int rate = 44100;
+        const float duration = 0.18f;
+        var count = Mathf.CeilToInt(rate * duration);
+        var data = new float[count];
+        var rng = new System.Random(20261126);
+
+        for (var i = 0; i < count; i++)
+        {
+            var t = i / (float)rate;
+            var noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            var crack = Mathf.Sin(2f * Mathf.PI * 120f * t) * 0.5f;
+            var env = Mathf.Exp(-t * 34f);
+            data[i] = Mathf.Clamp((noise * 0.75f + crack) * env, -1f, 1f);
+        }
+
+        var clip = AudioClip.Create("m0_shot", count, 1, rate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
+    private static AudioClip BuildClickClip()
+    {
+        const int rate = 44100;
+        const float duration = 0.05f;
+        var count = Mathf.CeilToInt(rate * duration);
+        var data = new float[count];
+        var rng = new System.Random(7);
+
+        for (var i = 0; i < count; i++)
+        {
+            var t = i / (float)rate;
+            var env = Mathf.Exp(-t * 120f);
+            data[i] = (float)(rng.NextDouble() * 2.0 - 1.0) * env * 0.6f;
+        }
+
+        var clip = AudioClip.Create("m0_click", count, 1, rate, false);
+        clip.SetData(data, 0);
+        return clip;
     }
 
     private void CreateTracer()

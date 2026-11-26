@@ -1,0 +1,11 @@
+<!--
+  IL2CPP 链接器保留名单。
+  根因：GameObject.CreatePrimitive 是在引擎内部 AddComponent(BoxCollider/CapsuleCollider)，
+  托管代码里从来没出现过这些类型名，于是链接器把它们裁掉了 —— 结果就是
+  “物体有 Renderer 能看见，但没有 Collider”，角色穿地、子弹打不中、拾取检测为空。
+-->
+<linker>
+  <assembly fullname="UnityEngine.PhysicsModule" preserve="all"/>
+  <assembly fullname="UnityEngine.AudioModule" preserve="all"/>
+  <assembly fullname="UnityEngine.ParticleSystemModule" preserve="all"/>
+</linker>
