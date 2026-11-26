@@ -61,12 +61,14 @@ jobs:
         with:
           lfs: true
 
-      - uses: actions/cache@v4
-        with:
-          path: Library
-          key: Library-Android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: |
-            Library-Android-
+      # 暂时不缓存 Library：
+      # 之前用 restore-keys 会命中旧提交的 Library，导致 "Build asset version error"
+      # 和幽灵资产（SampleScene.unity 已从仓库删除却仍被导入），最终 Unity 段错误退出 139。
+      # 先跑通一次干净构建，再加回精确 key（不带 restore-keys）。
+      # - uses: actions/cache@v4
+      #   with:
+      #     path: Library
+      #     key: Library-Android-v2-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
       - uses: game-ci/unity-builder@v4
         env:
