@@ -15,6 +15,7 @@ public sealed class MetaProfile
     public int BestLootValue;
     public int TotalLootValue;
     public float Sensitivity = 0.13f;
+    public int SelectedKit = 1;
     public bool FirstRunDone;
 
     public float ExtractRate => Raids <= 0 ? 0f : Extracts / (float)Raids;

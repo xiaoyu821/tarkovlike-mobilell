@@ -118,7 +118,8 @@ public sealed class PlayerRig : MonoBehaviour
     public float GroundY => _groundY;
     public Vector3 CameraPosition => _camera != null ? _camera.position : transform.position;
 
-    public void Initialize(TouchControls controls, GameApp app, Vector3 spawn, float yaw, float sensitivity)
+    public void Initialize(TouchControls controls, GameApp app, Vector3 spawn, float yaw, float sensitivity,
+        LoadoutKit kit)
     {
         _controls = controls;
         _app = app;
@@ -143,7 +144,13 @@ public sealed class PlayerRig : MonoBehaviour
         _audio.spatialBlend = 0f;
 
         Physics.SyncTransforms();
-        EquipDefaultLoadout();
+
+        if (kit == null) kit = Loadouts.All[0];
+        _armor = Mathf.Max(0f, kit.Armor);
+        _maxArmor = Mathf.Max(1f, kit.Armor);
+        _bandages = Mathf.Max(0, kit.Bandages);
+        _reserve = Mathf.Max(0, kit.Reserve);
+        EquipWeapon(kit.WeaponId);
     }
 
     private void Update()
@@ -623,7 +630,7 @@ public sealed class PlayerRig : MonoBehaviour
 
     // ---------- 装备 ----------
 
-    private void EquipDefaultLoadout()
+    private void EquipWeapon(string weaponId)
     {
         var catalog = GameDataBootstrap.Instance != null ? GameDataBootstrap.Instance.Catalog : null;
 
@@ -634,12 +641,17 @@ public sealed class PlayerRig : MonoBehaviour
             _rpm = 700f;
             _magazineSize = 30;
             _magazine = 30;
-            _reserve = 120;
+            if (_reserve <= 0) _reserve = 120;
             return;
         }
 
         WeaponData weapon = null;
-        if (!catalog.Weapons.TryGetValue("wpn_viper", out weapon))
+        if (!string.IsNullOrEmpty(weaponId))
+        {
+            catalog.Weapons.TryGetValue(weaponId, out weapon);
+        }
+
+        if (weapon == null)
         {
             weapon = catalog.Weapons.Values
                 .Where(x => x.Rpm > 0 && x.MagazineCapacity > 0)
@@ -665,7 +677,7 @@ public sealed class PlayerRig : MonoBehaviour
             _pellets = 1;
         }
 
-        _reserve = _magazineSize * 4;
+        _reserve = _reserve > 0 ? _reserve : _magazineSize * 4;
 
         if (weapon.RecoilCurve != null && weapon.RecoilCurve.Vertical != null &&
             weapon.RecoilCurve.Vertical.Count > 0)

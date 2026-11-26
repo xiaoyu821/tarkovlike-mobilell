@@ -83,37 +83,69 @@ public sealed class MenuUi : MonoBehaviour
             new Vector2(0f, 0.05f), new Vector2(1f, 0.6f), Vector2.zero, Vector2.zero,
             new Color(0.78f, 0.8f, 0.84f, 1f));
 
+        // ---- 出击装备 ----
+        for (var i = 0; i < Loadouts.All.Length; i++)
+        {
+            var kit = Loadouts.All[i];
+            var selected = profile.SelectedKit == i;
+            var affordable = profile.Roubles >= kit.Cost;
+
+            var background = selected
+                ? new Color(0.72f, 0.35f, 0.14f, 1f)
+                : new Color(0.13f, 0.14f, 0.16f, 1f);
+
+            var label = kit.Name + "\n" + (kit.Cost == 0 ? "免费" : (kit.Cost / 1000) + "k ₽") + "\n" + kit.Blurb;
+
+            var index = i;
+            UiKit.TextButton(root, "Kit" + i, label, new Vector2(0.5f, 0.5f),
+                new Vector2(-330f + i * 330f, -125f), new Vector2(300f, 118f), background,
+                affordable ? Color.white : new Color(0.62f, 0.48f, 0.48f, 1f), 24,
+                () => SelectKit(index));
+        }
+
         // ---- 主按钮 ----
         UiKit.TextButton(root, "StartButton", "进 入 突 袭", new Vector2(0.5f, 0.5f),
-            new Vector2(0f, -260f), new Vector2(520f, 130f), new Color(0.72f, 0.24f, 0.16f, 1f),
-            Color.white, 48, () => { if (_app != null) _app.StartRaid(); });
+            new Vector2(0f, -250f), new Vector2(520f, 118f), new Color(0.72f, 0.24f, 0.16f, 1f),
+            Color.white, 46, () => { if (_app != null) _app.StartRaid(); });
 
         // ---- 灵敏度 ----
         UiKit.TextButton(root, "SensDown", "－", new Vector2(0.5f, 0.5f),
-            new Vector2(-190f, -390f), new Vector2(110f, 90f), new Color(0.16f, 0.17f, 0.2f, 1f),
-            Color.white, 44, () => ChangeSensitivity(-0.02f));
+            new Vector2(-190f, -358f), new Vector2(110f, 84f), new Color(0.16f, 0.17f, 0.2f, 1f),
+            Color.white, 40, () => ChangeSensitivity(-0.02f));
 
         _sensitivityText = UiKit.Label(root, "SensValue",
-            "视角灵敏度 " + (profile.Sensitivity / 0.13f).ToString("0.00") + "x", 32,
+            "视角灵敏度 " + (profile.Sensitivity / 0.13f).ToString("0.00") + "x", 30,
             TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(-70f, -435f), new Vector2(70f, -345f), new Color(0.85f, 0.87f, 0.9f, 1f));
+            new Vector2(-70f, -398f), new Vector2(70f, -318f), new Color(0.85f, 0.87f, 0.9f, 1f));
 
         UiKit.TextButton(root, "SensUp", "＋", new Vector2(0.5f, 0.5f),
-            new Vector2(190f, -390f), new Vector2(110f, 90f), new Color(0.16f, 0.17f, 0.2f, 1f),
-            Color.white, 44, () => ChangeSensitivity(0.02f));
+            new Vector2(190f, -358f), new Vector2(110f, 84f), new Color(0.16f, 0.17f, 0.2f, 1f),
+            Color.white, 40, () => ChangeSensitivity(0.02f));
 
         // ---- 底部 ----
         UiKit.TextButton(root, "ResetButton", "重置存档", new Vector2(0.5f, 0f),
-            new Vector2(-180f, 110f), new Vector2(280f, 84f), new Color(0.14f, 0.15f, 0.17f, 1f),
-            new Color(0.85f, 0.5f, 0.45f, 1f), 30, ResetProfile);
+            new Vector2(-180f, 78f), new Vector2(280f, 78f), new Color(0.14f, 0.15f, 0.17f, 1f),
+            new Color(0.85f, 0.5f, 0.45f, 1f), 28, ResetProfile);
 
         UiKit.TextButton(root, "QuitButton", "退出", new Vector2(0.5f, 0f),
-            new Vector2(180f, 110f), new Vector2(280f, 84f), new Color(0.14f, 0.15f, 0.17f, 1f),
-            new Color(0.78f, 0.8f, 0.84f, 1f), 30, () => { Application.Quit(); });
+            new Vector2(180f, 78f), new Vector2(280f, 78f), new Color(0.14f, 0.15f, 0.17f, 1f),
+            new Color(0.78f, 0.8f, 0.84f, 1f), 28, () => { Application.Quit(); });
 
         UiKit.Label(root, "Hint", "左半屏拖动移动 · 右半屏滑动看 · 开火/镜/搜/换 在右下 · 跑/医 在左下",
-            26, TextAnchor.MiddleCenter, new Vector2(0f, 0f), new Vector2(1f, 0f),
-            new Vector2(0f, 28f), new Vector2(0f, 70f), new Color(0.6f, 0.62f, 0.66f, 1f));
+            24, TextAnchor.MiddleCenter, new Vector2(0f, 0.70f), new Vector2(1f, 0.72f),
+            Vector2.zero, Vector2.zero, new Color(0.6f, 0.62f, 0.66f, 1f));
+    }
+
+    private void SelectKit(int index)
+    {
+        if (_app == null) return;
+
+        var kit = Loadouts.Get(index);
+        if (_app.Profile.Roubles < kit.Cost) return;
+
+        _app.Profile.SelectedKit = index;
+        _app.Profile.Save();
+        ShowMainMenu(_app);
     }
 
     private void ChangeSensitivity(float delta)

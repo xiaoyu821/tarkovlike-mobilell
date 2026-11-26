@@ -40,6 +40,7 @@ public sealed class GameApp : MonoBehaviour
     public IReadOnlyList<ExtractionZone> Extractions => _extractions;
 
     private readonly List<ExtractionZone> _extractions = new List<ExtractionZone>();
+    private LoadoutKit _currentKit;
 
     private GameObject _raidRoot;
     private GameObject _controlsRoot;
@@ -114,6 +115,14 @@ public sealed class GameApp : MonoBehaviour
 
         Physics.SyncTransforms();
 
+        // 进场先扣装备钱：这就是"带装备下本"的风险
+        _currentKit = Loadouts.Resolve(Profile);
+        if (_currentKit.Cost > 0)
+        {
+            Profile.Roubles = Mathf.Max(0, Profile.Roubles - _currentKit.Cost);
+            Profile.Save();
+        }
+
         SpawnPlayer(builder.PlayerSpawn, builder.PlayerYaw);
         SpawnEnemies(builder.EnemySpawns);
 
@@ -158,7 +167,7 @@ public sealed class GameApp : MonoBehaviour
 
         var rig = go.AddComponent<PlayerRig>();
         rig.Message += Toast;
-        rig.Initialize(controls, this, spawn, yaw, Profile.Sensitivity);
+        rig.Initialize(controls, this, spawn, yaw, Profile.Sensitivity, _currentKit);
         Player = rig;
 
         Physics.SyncTransforms();
