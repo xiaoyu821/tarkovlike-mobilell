@@ -62,11 +62,10 @@ public sealed class M0Bootstrap : MonoBehaviour
         var crateMaterial = CreateMaterial(new Color(0.5f, 0.38f, 0.2f));
         var dummyMaterial = CreateMaterial(new Color(0.65f, 0.18f, 0.18f));
 
-        var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-        floor.name = "Ground";
-        floor.transform.SetParent(root, false);
-        floor.transform.localScale = new Vector3(9f, 1f, 9f);
-        floor.GetComponent<Renderer>().sharedMaterial = ground;
+        // 地面用厚 Box，不用 Plane：
+        // 1) Plane 是零厚度、单面的 MeshCollider，首帧 dt 抖动时 CharacterController 容易直接穿过去；
+        // 2) 从下方看 Plane 完全不可见，掉下去就是一片纯黑，根本看不出发生了什么。
+        CreateCube("Ground", new Vector3(0f, -1f, 0f), new Vector3(90f, 2f, 90f), ground, root);
 
         CreateCube("WallNorth", new Vector3(0f, 3f, 45f), new Vector3(90f, 6f, 0.6f), wall, root);
         CreateCube("WallSouth", new Vector3(0f, 3f, -45f), new Vector3(90f, 6f, 0.6f), wall, root);
@@ -96,7 +95,20 @@ public sealed class M0Bootstrap : MonoBehaviour
     {
         var playerGo = new GameObject("Player");
         playerGo.transform.SetParent(root, false);
-        playerGo.transform.position = new Vector3(0f, 0.05f, -6f);
+
+        // 出生点不要硬编码 y：先向下打射线找地面。
+        // 之前写死 0.05，一旦地面没生成或位置不对，开场就是自由落体。
+        var spawn = new Vector3(0f, 2f, -6f);
+        Physics.SyncTransforms();
+        if (Physics.Raycast(spawn + Vector3.up * 5f, Vector3.down, out var groundHit, 30f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            spawn.y = groundHit.point.y + 0.1f;
+        }
+        else
+        {
+            Debug.LogWarning("[M0] 出生点下方没有地面，玩家会掉落：检查 Ground 是否生成");
+        }
+        playerGo.transform.position = spawn;
 
         var controller = playerGo.AddComponent<CharacterController>();
         controller.height = 1.8f;
@@ -251,6 +263,14 @@ public sealed class M0Bootstrap : MonoBehaviour
         GUI.Label(new Rect(Screen.width * 0.5f - 220f, Screen.height - 120f, 440f, 56f), ammoText, _hudStyle);
         GUI.Label(new Rect(Screen.width - 520f, 16f, 500f, 48f),
             "M0 训练场 · " + _player.WeaponName, _hudStyle);
+
+        // 诊断行：掉下去的时候这三个数能直接告诉我们发生了什么
+        GUI.Label(new Rect(16f, Screen.height - 196f, 560f, 44f),
+            string.Format("y={0:0.00}  grounded={1}  fps={2:0}",
+                _player.transform.position.y,
+                _player.Grounded ? "Y" : "N",
+                1f / Mathf.Max(0.0001f, Time.smoothDeltaTime)),
+            _toastStyle);
 
         if (Time.time - _startTime < 15f)
         {

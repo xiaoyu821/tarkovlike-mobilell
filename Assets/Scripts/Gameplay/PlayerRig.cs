@@ -23,6 +23,7 @@ public sealed class PlayerRig : MonoBehaviour
     private float _yaw;
     private float _pitch;
     private float _verticalSpeed;
+    private Vector3 _spawnPosition;
     private float _nextFireTime;
     private float _reloadEndTime;
     private float _tracerEndTime;
@@ -42,6 +43,7 @@ public sealed class PlayerRig : MonoBehaviour
     public int Magazine => _magazine;
     public int MagazineSize => _magazineSize;
     public bool Reloading => _reloading;
+    public bool Grounded => _controller != null && _controller.isGrounded;
 
     public void Initialize(TouchControls controls)
     {
@@ -49,6 +51,7 @@ public sealed class PlayerRig : MonoBehaviour
         _controller = GetComponent<CharacterController>();
         _camera = GetComponentInChildren<Camera>().transform;
         _yaw = transform.eulerAngles.y;
+        _spawnPosition = transform.position;
         _magazine = _magazineSize;
         CreateTracer();
         TryLoadWeapon();
@@ -86,6 +89,10 @@ public sealed class PlayerRig : MonoBehaviour
 
     private void UpdateMovement()
     {
+        // 首帧 / 卡顿帧的 dt 可能到 0.3s，乘上重力就是好几米位移，
+        // CharacterController 的扫掠有可能直接穿过薄地面。钳到 50ms。
+        var dt = Mathf.Min(Time.deltaTime, 0.05f);
+
         var input = _controls.Move;
         var direction = transform.right * input.x + transform.forward * input.y;
         if (direction.sqrMagnitude > 1f)
@@ -98,9 +105,33 @@ public sealed class PlayerRig : MonoBehaviour
             _verticalSpeed = -2f;
         }
 
-        _verticalSpeed += Gravity * Time.deltaTime;
+        _verticalSpeed += Gravity * dt;
         var velocity = direction * MoveSpeed + Vector3.up * _verticalSpeed;
-        _controller.Move(velocity * Time.deltaTime);
+        _controller.Move(velocity * dt);
+
+        // 兜底：真的掉出世界也别无限下落，拉回出生点并提示
+        if (transform.position.y < -5f)
+        {
+            Respawn();
+        }
+    }
+
+    private void Respawn()
+    {
+        _verticalSpeed = 0f;
+        if (_controller != null)
+        {
+            _controller.enabled = false;
+        }
+
+        transform.position = _spawnPosition;
+
+        if (_controller != null)
+        {
+            _controller.enabled = true;
+        }
+
+        Message?.Invoke("掉出世界，已重置位置");
     }
 
     private void UpdateReload()
