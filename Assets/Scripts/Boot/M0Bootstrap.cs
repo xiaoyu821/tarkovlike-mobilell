@@ -316,7 +316,7 @@ public sealed class M0Bootstrap : MonoBehaviour
         {
             var t = _player.MuzzleFlash01;
             var cx = Screen.width * 0.5f;
-            var cy = Screen.height * 0.42f;
+            var cy = Screen.height * 0.58f; // 枪口在准星下方，别糊在准星上
             var len = Mathf.Lerp(10f, 62f, t);
             var core = Mathf.Lerp(6f, 26f, t);
 
