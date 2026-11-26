@@ -24,6 +24,7 @@ public sealed class PlayerRig : MonoBehaviour
     private float _pitch;
     private float _verticalSpeed;
     private Vector3 _spawnPosition;
+    private float _groundY;
     private float _nextFireTime;
     private float _reloadEndTime;
     private float _tracerEndTime;
@@ -44,6 +45,8 @@ public sealed class PlayerRig : MonoBehaviour
     public int MagazineSize => _magazineSize;
     public bool Reloading => _reloading;
     public bool Grounded => _controller != null && _controller.isGrounded;
+    public float GroundY => _groundY;
+    public Vector3 CameraPosition => _camera != null ? _camera.position : Vector3.zero;
 
     public void Initialize(TouchControls controls)
     {
@@ -52,6 +55,7 @@ public sealed class PlayerRig : MonoBehaviour
         _camera = GetComponentInChildren<Camera>().transform;
         _yaw = transform.eulerAngles.y;
         _spawnPosition = transform.position;
+        _groundY = _spawnPosition.y;
         Physics.SyncTransforms();
         _magazine = _magazineSize;
         CreateTracer();
@@ -110,11 +114,29 @@ public sealed class PlayerRig : MonoBehaviour
         var velocity = direction * MoveSpeed + Vector3.up * _verticalSpeed;
         _controller.Move(velocity * dt);
 
+        // 硬约束：白盒地面是平的，无论物理为何没挡住，都不允许沉到地面以下。
+        // （如果这里一直在触发，说明 CC 根本没和地面碰撞，需要在 HUD 上看 ray 数据）
+        if (transform.position.y < _groundY - 0.02f)
+        {
+            SnapToGround();
+        }
+
         // 兜底：真的掉出世界也别无限下落，拉回出生点并提示
         if (transform.position.y < -5f)
         {
             Respawn();
         }
+    }
+
+    private void SnapToGround()
+    {
+        _verticalSpeed = 0f;
+        var pos = transform.position;
+        pos.y = _groundY;
+        if (_controller != null) _controller.enabled = false;
+        transform.position = pos;
+        if (_controller != null) _controller.enabled = true;
+        Physics.SyncTransforms();
     }
 
     private void Respawn()

@@ -17,6 +17,10 @@ public sealed class M0Bootstrap : MonoBehaviour
     private readonly List<Toast> _toasts = new List<Toast>();
 
     private PlayerRig _player;
+    private Camera _playerCamera;
+    private Transform _ground;
+    private string _diag = "";
+    private float _nextDiag;
     private GUIStyle _hudStyle;
     private GUIStyle _toastStyle;
     private float _startTime;
@@ -71,7 +75,8 @@ public sealed class M0Bootstrap : MonoBehaviour
         // 地面用厚 Box，不用 Plane：
         // 1) Plane 是零厚度、单面的 MeshCollider，首帧 dt 抖动时 CharacterController 容易直接穿过去；
         // 2) 从下方看 Plane 完全不可见，掉下去就是一片纯黑，根本看不出发生了什么。
-        CreateCube("Ground", new Vector3(0f, -1f, 0f), new Vector3(90f, 2f, 90f), ground, root);
+        var groundGo = CreateCube("Ground", new Vector3(0f, -1f, 0f), new Vector3(90f, 2f, 90f), ground, root);
+        _ground = groundGo.transform;
 
         CreateCube("WallNorth", new Vector3(0f, 3f, 45f), new Vector3(90f, 6f, 0.6f), wall, root);
         CreateCube("WallSouth", new Vector3(0f, 3f, -45f), new Vector3(90f, 6f, 0.6f), wall, root);
@@ -136,6 +141,7 @@ public sealed class M0Bootstrap : MonoBehaviour
         cameraComponent.clearFlags = CameraClearFlags.SolidColor;
         cameraComponent.backgroundColor = new Color(0.08f, 0.09f, 0.11f);
         cameraGo.AddComponent<AudioListener>();
+        _playerCamera = cameraComponent;
 
         _player = playerGo.AddComponent<PlayerRig>();
         _player.Message += ShowToast;
@@ -209,6 +215,46 @@ public sealed class M0Bootstrap : MonoBehaviour
         return new Material(shader) { color = color };
     }
 
+    private void Update()
+    {
+        if (Time.time < _nextDiag) return;
+        _nextDiag = Time.time + 0.5f;
+        _diag = BuildDiagnostics();
+    }
+
+    private string BuildDiagnostics()
+    {
+        if (_player == null) return "player=null";
+
+        var p = _player.transform.position;
+        var c = _playerCamera != null ? _playerCamera.transform.position : Vector3.zero;
+        var ray = "ray=none";
+        if (Physics.Raycast(c + Vector3.up * 0.2f, Vector3.down, out var hit, 50f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            ray = string.Format("ray={0}@{1:0.00}m", hit.collider.name, hit.distance);
+        }
+
+        var groundInfo = "ground=null";
+        if (_ground != null)
+        {
+            var col = _ground.GetComponent<Collider>();
+            groundInfo = string.Format("ground y={0:0.0} col={1} trig={2} layer={3}",
+                _ground.position.y,
+                col != null ? col.GetType().Name : "none",
+                col != null && col.isTrigger ? "Y" : "N",
+                _ground.gameObject.layer);
+        }
+
+        return string.Format("P=({0:0.0},{1:0.0},{2:0.0}) C=({3:0.0},{4:0.0},{5:0.0})\n" +
+                             "grounded={6} dt={7:0.000} fps={8:0} cams={9} autoSync={10}\n" +
+                             "{11}\n{12}",
+            p.x, p.y, p.z, c.x, c.y, c.z,
+            _player.Grounded ? "Y" : "N", Time.deltaTime,
+            1f / Mathf.Max(0.0001f, Time.smoothDeltaTime),
+            Camera.allCamerasCount, Physics.autoSyncTransforms,
+            groundInfo, ray);
+    }
+
     private void OnGUI()
     {
         EnsureStyles();
@@ -271,13 +317,8 @@ public sealed class M0Bootstrap : MonoBehaviour
         GUI.Label(new Rect(Screen.width - 520f, 16f, 500f, 48f),
             "M0 训练场 · " + _player.WeaponName, _hudStyle);
 
-        // 诊断行：掉下去的时候这三个数能直接告诉我们发生了什么
-        GUI.Label(new Rect(16f, Screen.height - 196f, 560f, 44f),
-            string.Format("y={0:0.00}  grounded={1}  fps={2:0}",
-                _player.transform.position.y,
-                _player.Grounded ? "Y" : "N",
-                1f / Mathf.Max(0.0001f, Time.smoothDeltaTime)),
-            _toastStyle);
+        // 诊断块：掉下去的时候这几行能直接告诉我们发生了什么
+        GUI.Label(new Rect(16f, Screen.height - 300f, 900f, 150f), _diag, _toastStyle);
 
         if (Time.time - _startTime < 15f)
         {
