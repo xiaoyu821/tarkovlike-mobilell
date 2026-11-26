@@ -219,6 +219,12 @@ public sealed class LootContainer : MonoBehaviour
         if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
         if (shader == null) shader = Shader.Find("Sprites/Default");
 
-        return new Material(shader) { color = color };
+        var material = new Material(shader) { color = color };
+
+        // 加一点自发光：白盒地图没有烘焙光照，纯靠反射光根本看不见箱子在哪
+        material.EnableKeyword("_EMISSION");
+        material.SetColor("_EmissionColor", color * 0.45f);
+
+        return material;
     }
 }

@@ -7,7 +7,7 @@ using UnityEngine;
 /// </summary>
 public sealed class RaidMapBuilder
 {
-    public const float MapHalf = 58f;
+    public const float MapHalf = 46f;
     private const float WallHeight = 3.4f;
     private const float WallThickness = 0.45f;
 
@@ -81,8 +81,8 @@ public sealed class RaidMapBuilder
 
     private void PlaceExtractions()
     {
-        AddExtraction("北侧撤离点", new Vector3(36f, 0f, 46f));
-        AddExtraction("西侧撤离点", new Vector3(-44f, 0f, -36f));
+        AddExtraction("北侧撤离点", new Vector3(30f, 0f, 34f));
+        AddExtraction("西侧撤离点", new Vector3(-32f, 0f, -28f));
     }
 
     private void AddExtraction(string name, Vector3 center)
@@ -114,7 +114,7 @@ public sealed class RaidMapBuilder
 
     private void BuildBuildings()
     {
-        var target = 16;
+        var target = 14;
         var placed = 0;
 
         for (var attempt = 0; attempt < 400 && placed < target; attempt++)
@@ -248,8 +248,8 @@ public sealed class RaidMapBuilder
 
     private void PlaceLoot()
     {
-        // 建筑里放 5 个外套箱
-        for (var i = 0; i < 5 && _buildings.Count > 0; i++)
+        // 建筑里放 9 个外套箱（屋里是主要搜刮点）
+        for (var i = 0; i < 9 && _buildings.Count > 0; i++)
         {
             var rect = _buildings[_rng.Next(0, _buildings.Count)];
             var x = RandomRange(rect.xMin + 1.6f, rect.xMax - 1.6f);
@@ -259,10 +259,10 @@ public sealed class RaidMapBuilder
             LootCount++;
         }
 
-        // 户外放 4 个武器箱
-        for (var i = 0; i < 4; i++)
+        // 户外放 5 个武器箱
+        for (var i = 0; i < 5; i++)
         {
-            for (var attempt = 0; attempt < 24; attempt++)
+            for (var attempt = 0; attempt < 40; attempt++)
             {
                 var x = RandomRange(-MapHalf + 6f, MapHalf - 6f);
                 var z = RandomRange(-MapHalf + 6f, MapHalf - 6f);
@@ -280,10 +280,10 @@ public sealed class RaidMapBuilder
             }
         }
 
-        // 再补 4 个外套箱
-        for (var i = 0; i < 4; i++)
+        // 再补 6 个外套箱
+        for (var i = 0; i < 6; i++)
         {
-            for (var attempt = 0; attempt < 24; attempt++)
+            for (var attempt = 0; attempt < 40; attempt++)
             {
                 var x = RandomRange(-MapHalf + 6f, MapHalf - 6f);
                 var z = RandomRange(-MapHalf + 6f, MapHalf - 6f);
@@ -312,9 +312,9 @@ public sealed class RaidMapBuilder
 
     private void PlaceEnemySpawns()
     {
-        var target = 8;
+        var target = 10;
 
-        for (var attempt = 0; attempt < 400 && EnemySpawns.Count < target; attempt++)
+        for (var attempt = 0; attempt < 500 && EnemySpawns.Count < target; attempt++)
         {
             var x = RandomRange(-MapHalf + 8f, MapHalf - 8f);
             var z = RandomRange(-MapHalf + 8f, MapHalf - 8f);
