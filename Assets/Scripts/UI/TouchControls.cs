@@ -3,8 +3,8 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// M0 触屏控制层：左半屏动态摇杆移动，右半屏拖动视角，
-/// 右下角开火 / 拾取按钮。全部用 uGUI 指针事件，屏蔽新旧输入系统差异。
+/// 触屏控制层：左半屏动态摇杆移动，右半屏拖动视角，
+/// 右下角开火/开镜/搜刮/换弹，左下角冲刺/治疗。全部用 uGUI 指针事件。
 /// </summary>
 public sealed class TouchControls : MonoBehaviour
 {
@@ -15,26 +15,41 @@ public sealed class TouchControls : MonoBehaviour
     private Vector2 _lookDelta;
     private VirtualJoystick _joystick;
     private HoldButton _fire;
+    private HoldButton _aim;
+    private HoldButton _sprint;
     private TapButton _interact;
+    private TapButton _heal;
+    private TapButton _reload;
+    private bool _inputEnabled = true;
 
-    public Vector2 Move => _joystick != null ? _joystick.Value : Vector2.zero;
-    public bool FireHeld => _fire != null && _fire.Held;
+    public Vector2 Move => _inputEnabled && _joystick != null ? _joystick.Value : Vector2.zero;
+    public bool FireHeld => _inputEnabled && _fire != null && _fire.Held;
+    public bool AimHeld => _inputEnabled && _aim != null && _aim.Held;
+    public bool SprintHeld => _inputEnabled && _sprint != null && _sprint.Held;
 
     public static TouchControls Create()
     {
         var canvasGo = new GameObject("TouchControls", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        canvasGo.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+        var canvas = canvasGo.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 10;
 
         var scaler = canvasGo.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight = 0.5f;
 
-        EnsureEventSystem();
+        UiEventSystem.Ensure();
 
         var controls = canvasGo.AddComponent<TouchControls>();
         controls.Build(canvasGo.transform);
         return controls;
+    }
+
+    public void SetInputEnabled(bool enabled)
+    {
+        _inputEnabled = enabled;
+        _lookDelta = Vector2.zero;
     }
 
     public Vector2 ConsumeLookDelta()
@@ -44,38 +59,14 @@ public sealed class TouchControls : MonoBehaviour
         return value;
     }
 
-    public bool ConsumeInteract()
-    {
-        return _interact != null && _interact.Consume();
-    }
+    public bool ConsumeInteract() => _inputEnabled && _interact != null && _interact.Consume();
+    public bool ConsumeHeal() => _inputEnabled && _heal != null && _heal.Consume();
+    public bool ConsumeReload() => _inputEnabled && _reload != null && _reload.Consume();
 
     internal void AddLook(Vector2 delta)
     {
+        if (!_inputEnabled) return;
         _lookDelta += delta;
-    }
-
-    private static void EnsureEventSystem()
-    {
-        var existing = Object.FindFirstObjectByType<EventSystem>();
-        if (existing != null)
-        {
-            // 默认阈值 10px：手指移动的前 10px 完全没反应，手机上就是"滑一下没动、再滑才动"。
-            existing.pixelDragThreshold = 1;
-            return;
-        }
-
-        var eventSystemGo = new GameObject("EventSystem", typeof(EventSystem));
-#if ENABLE_INPUT_SYSTEM
-        eventSystemGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
-#else
-        eventSystemGo.AddComponent<StandaloneInputModule>();
-#endif
-
-        var eventSystem = eventSystemGo.GetComponent<EventSystem>();
-        if (eventSystem != null)
-        {
-            eventSystem.pixelDragThreshold = 1;
-        }
     }
 
     private void Build(Transform root)
@@ -88,11 +79,23 @@ public sealed class TouchControls : MonoBehaviour
         _joystick = moveArea.gameObject.AddComponent<VirtualJoystick>();
         _joystick.Initialize(moveArea, JoystickRadius, CircleSprite());
 
-        _fire = CreateButton<HoldButton>(root, "FireButton", "开火",
-            new Vector2(-210f, 230f), 190f, new Color(0.85f, 0.2f, 0.2f, 0.5f));
+        _fire = CreateButton<HoldButton>(root, "FireButton", "开火", new Vector2(1f, 0f),
+            new Vector2(-230f, 250f), 200f, new Color(0.85f, 0.2f, 0.2f, 0.5f));
 
-        _interact = CreateButton<TapButton>(root, "InteractButton", "拿",
-            new Vector2(-210f, 450f), 130f, new Color(0.2f, 0.6f, 0.9f, 0.5f));
+        _aim = CreateButton<HoldButton>(root, "AimButton", "镜", new Vector2(1f, 0f),
+            new Vector2(-230f, 480f), 140f, new Color(0.9f, 0.75f, 0.25f, 0.4f));
+
+        _interact = CreateButton<TapButton>(root, "SearchButton", "搜", new Vector2(1f, 0f),
+            new Vector2(-440f, 300f), 140f, new Color(0.2f, 0.6f, 0.9f, 0.45f));
+
+        _reload = CreateButton<TapButton>(root, "ReloadButton", "换", new Vector2(1f, 0f),
+            new Vector2(-440f, 510f), 130f, new Color(0.75f, 0.75f, 0.8f, 0.4f));
+
+        _sprint = CreateButton<HoldButton>(root, "SprintButton", "跑", new Vector2(0f, 0f),
+            new Vector2(150f, 150f), 130f, new Color(0.3f, 0.85f, 0.4f, 0.4f));
+
+        _heal = CreateButton<TapButton>(root, "HealButton", "医", new Vector2(0f, 0f),
+            new Vector2(150f, 330f), 130f, new Color(0.9f, 0.45f, 0.5f, 0.4f));
     }
 
     private static RectTransform CreateArea(string name, Transform root, Vector2 anchorMin, Vector2 anchorMax)
@@ -113,13 +116,13 @@ public sealed class TouchControls : MonoBehaviour
     }
 
     private static T CreateButton<T>(Transform root, string name, string label,
-        Vector2 anchoredPosition, float size, Color color) where T : MonoBehaviour
+        Vector2 anchor, Vector2 anchoredPosition, float size, Color color) where T : MonoBehaviour
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(Image));
         var rect = (RectTransform)go.transform;
         rect.SetParent(root, false);
-        rect.anchorMin = new Vector2(1f, 0f);
-        rect.anchorMax = new Vector2(1f, 0f);
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.sizeDelta = new Vector2(size, size);
         rect.anchoredPosition = anchoredPosition;
@@ -140,7 +143,7 @@ public sealed class TouchControls : MonoBehaviour
         var text = textGo.GetComponent<Text>();
         text.text = label;
         text.alignment = TextAnchor.MiddleCenter;
-        text.font = BuiltinFont();
+        text.font = UiFont.Default;
         text.fontSize = Mathf.RoundToInt(size * 0.3f);
         text.color = new Color(1f, 1f, 1f, 0.9f);
         text.raycastTarget = false;
@@ -148,18 +151,9 @@ public sealed class TouchControls : MonoBehaviour
         return go.AddComponent<T>();
     }
 
-    private static Font BuiltinFont()
-    {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        return font != null ? font : Resources.GetBuiltinResource<Font>("Arial.ttf");
-    }
-
     private static Sprite CircleSprite()
     {
-        if (_circleSprite != null)
-        {
-            return _circleSprite;
-        }
+        if (_circleSprite != null) return _circleSprite;
 
         const int size = 128;
         var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
@@ -183,10 +177,7 @@ public sealed class TouchControls : MonoBehaviour
         return _circleSprite;
     }
 
-    /// <summary>
-    /// 右半屏视角区。只让第一根手指驱动视角：
-    /// 之前没有绑定 pointerId，两根手指同时拖动时 delta 会叠加，视角直接飞出去。
-    /// </summary>
+    /// <summary>只让第一根手指驱动视角，双指不会叠加导致视角乱飞。</summary>
     private sealed class LookPad : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
     {
         public TouchControls Owner;
@@ -195,28 +186,18 @@ public sealed class TouchControls : MonoBehaviour
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (_pointerId == -1)
-            {
-                _pointerId = eventData.pointerId;
-            }
+            if (_pointerId == -1) _pointerId = eventData.pointerId;
         }
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (eventData.pointerId != _pointerId)
-            {
-                return;
-            }
-
+            if (eventData.pointerId != _pointerId) return;
             Owner.AddLook(eventData.delta);
         }
 
         public void OnPointerUp(PointerEventData eventData)
         {
-            if (eventData.pointerId == _pointerId)
-            {
-                _pointerId = -1;
-            }
+            if (eventData.pointerId == _pointerId) _pointerId = -1;
         }
     }
 
@@ -243,10 +224,7 @@ public sealed class TouchControls : MonoBehaviour
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (_pointerId != -1)
-            {
-                return;
-            }
+            if (_pointerId != -1) return;
 
             _pointerId = eventData.pointerId;
             _origin = LocalPoint(eventData);
@@ -258,10 +236,7 @@ public sealed class TouchControls : MonoBehaviour
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (eventData.pointerId != _pointerId)
-            {
-                return;
-            }
+            if (eventData.pointerId != _pointerId) return;
 
             var offset = Vector2.ClampMagnitude(LocalPoint(eventData) - _origin, _radius);
             _knob.anchoredPosition = offset;
@@ -270,10 +245,7 @@ public sealed class TouchControls : MonoBehaviour
 
         public void OnPointerUp(PointerEventData eventData)
         {
-            if (eventData.pointerId != _pointerId)
-            {
-                return;
-            }
+            if (eventData.pointerId != _pointerId) return;
 
             _pointerId = -1;
             _base.gameObject.SetActive(false);

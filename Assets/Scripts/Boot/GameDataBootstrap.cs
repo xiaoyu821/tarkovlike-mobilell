@@ -22,6 +22,7 @@ public sealed class GameDataBootstrap : MonoBehaviour
 
     private string _status = "正在加载数据…";
     private GUIStyle _style;
+    private float _hideAt = float.MaxValue;
 
     public static GameDataBootstrap Instance { get; private set; }
 
@@ -82,6 +83,7 @@ public sealed class GameDataBootstrap : MonoBehaviour
                           "  armor=" + Catalog.Armor.Count +
                           "  loot=" + Catalog.LootTables.Count;
                 Debug.Log("[Data] " + _status.Replace("\n", " "));
+                _hideAt = Time.time + 6f;
             }
         }
         catch (System.Exception exception)
@@ -93,6 +95,9 @@ public sealed class GameDataBootstrap : MonoBehaviour
 
     private void OnGUI()
     {
+        // 加载成功后再挂 6 秒就收起来，别一直挡着游戏画面
+        if (Time.time > _hideAt) return;
+
         if (_style == null)
         {
             _style = new GUIStyle(GUI.skin.label)
