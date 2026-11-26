@@ -52,6 +52,7 @@ public sealed class PlayerRig : MonoBehaviour
         _camera = GetComponentInChildren<Camera>().transform;
         _yaw = transform.eulerAngles.y;
         _spawnPosition = transform.position;
+        Physics.SyncTransforms();
         _magazine = _magazineSize;
         CreateTracer();
         TryLoadWeapon();
@@ -125,6 +126,7 @@ public sealed class PlayerRig : MonoBehaviour
         }
 
         transform.position = _spawnPosition;
+        Physics.SyncTransforms();
 
         if (_controller != null)
         {

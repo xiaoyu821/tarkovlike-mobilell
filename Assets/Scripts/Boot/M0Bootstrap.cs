@@ -28,7 +28,13 @@ public sealed class M0Bootstrap : MonoBehaviour
         QualitySettings.vSyncCount = 0;
         _startTime = Time.time;
 
+        // 关键：工程里 ProjectSettings/DynamicsManager 的 m_AutoSyncTransforms = 0。
+        // 这种情况下用 transform.position 摆好物体后，物理世界里的碰撞体还停在旧位置，
+        // 运行时生成的墙/地面就会“看起来在那、实际不在那”，CharacterController 直接穿地。
+        Physics.autoSyncTransforms = true;
+
         BuildWorld();
+        Physics.SyncTransforms();
     }
 
     public void ShowToast(string text)
@@ -109,6 +115,7 @@ public sealed class M0Bootstrap : MonoBehaviour
             Debug.LogWarning("[M0] 出生点下方没有地面，玩家会掉落：检查 Ground 是否生成");
         }
         playerGo.transform.position = spawn;
+        Physics.SyncTransforms(); // 让 CC 的胶囊体真的落在这个坐标上
 
         var controller = playerGo.AddComponent<CharacterController>();
         controller.height = 1.8f;
