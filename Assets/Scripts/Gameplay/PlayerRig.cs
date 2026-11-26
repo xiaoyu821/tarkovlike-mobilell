@@ -20,7 +20,7 @@ public sealed class PlayerRig : MonoBehaviour
     private TouchControls _controls;
     private LineRenderer _tracer;
     private AudioSource _audio;
-    private AudioClip _shotClip;
+    private AudioClip[] _shotClips;
     private AudioClip _clickClip;
     private float _flashUntil;
     private float _hitMarkerUntil;
@@ -52,6 +52,7 @@ public sealed class PlayerRig : MonoBehaviour
     public bool Reloading => _reloading;
     public bool Grounded => _controller != null && _controller.isGrounded;
     public bool MuzzleFlashActive => Time.time < _flashUntil;
+    public float MuzzleFlash01 => Mathf.Clamp01((_flashUntil - Time.time) / 0.05f);
     public bool HitMarkerActive => Time.time < _hitMarkerUntil;
     public float GroundY => _groundY;
     public Vector3 CameraPosition => _camera != null ? _camera.position : Vector3.zero;
@@ -238,10 +239,9 @@ public sealed class PlayerRig : MonoBehaviour
             _hitMarkerUntil = Time.time + 0.09f;
         }
 
-        if (_audio != null && _shotClip != null)
+        if (_audio != null && _shotClips != null && _shotClips.Length > 0)
         {
-            _audio.pitch = UnityEngine.Random.Range(0.94f, 1.06f);
-            _audio.PlayOneShot(_shotClip, 0.85f);
+            _audio.PlayOneShot(_shotClips[UnityEngine.Random.Range(0, _shotClips.Length)], 0.6f);
         }
     }
 
@@ -356,32 +356,56 @@ public sealed class PlayerRig : MonoBehaviour
         _audio.playOnAwake = false;
         _audio.spatialBlend = 0f;
         _audio.volume = 1f;
-        _shotClip = BuildShotClip();
+
+        // 3 个变体，避免连发时听起来像复读机
+        _shotClips = new[]
+        {
+            BuildShotClip(11, 92f),
+            BuildShotClip(23, 84f),
+            BuildShotClip(37, 101f)
+        };
         _clickClip = BuildClickClip();
     }
 
     /// <summary>
-    /// 程序化合成枪声：没有音频资源也能有反馈。
-    /// 噪声 + 低频冲击 + 指数衰减，比"完全静音"强一百倍。
+    /// 程序化枪声：瞬态爆点 + 中频主体 + 低频冲击 + 房间尾巴。
+    /// 之前只有"一段噪声 + 指数衰减"，听起来像放气，所以重写了这套四段式。
     /// </summary>
-    private static AudioClip BuildShotClip()
+    private static AudioClip BuildShotClip(int seed, float thumpHz)
     {
         const int rate = 44100;
-        const float duration = 0.18f;
+        const float duration = 0.32f;
         var count = Mathf.CeilToInt(rate * duration);
         var data = new float[count];
-        var rng = new System.Random(20261126);
+        var rng = new System.Random(seed);
+
+        var lp1 = 0f; // 中频（枪口主体）
+        var lp2 = 0f; // 更低频（空气/墙壁反射）
 
         for (var i = 0; i < count; i++)
         {
             var t = i / (float)rate;
             var noise = (float)(rng.NextDouble() * 2.0 - 1.0);
-            var crack = Mathf.Sin(2f * Mathf.PI * 120f * t) * 0.5f;
-            var env = Mathf.Exp(-t * 34f);
-            data[i] = Mathf.Clamp((noise * 0.75f + crack) * env, -1f, 1f);
+
+            lp1 += (noise - lp1) * 0.42f;
+            lp2 += (lp1 - lp2) * 0.06f;
+
+            // 1) 击发瞬态：前 5ms 的高频爆点，决定"脆"
+            var transient = t < 0.005f ? noise * (1f - t / 0.005f) * 0.9f : 0f;
+
+            // 2) 主体：中频噪声快速衰减，决定"实"
+            var body = lp1 * Mathf.Exp(-t * 60f) * 1.5f;
+
+            // 3) 低频冲击：决定"闷"和力度
+            var thump = Mathf.Sin(2f * Mathf.PI * thumpHz * t) * Mathf.Exp(-t * 24f) * 0.85f;
+
+            // 4) 尾巴：极轻的房间回响
+            var tail = lp2 * Mathf.Exp(-t * 5.5f) * 0.45f;
+
+            data[i] = Mathf.Clamp(transient + body + thump + tail, -1f, 1f);
         }
 
-        var clip = AudioClip.Create("m0_shot", count, 1, rate, false);
+        var clip = AudioClip.Create("m0_shot_" + seed, count, 1, rate, false);
         clip.SetData(data, 0);
         return clip;
     }
@@ -389,16 +413,20 @@ public sealed class PlayerRig : MonoBehaviour
     private static AudioClip BuildClickClip()
     {
         const int rate = 44100;
-        const float duration = 0.05f;
+        const float duration = 0.06f;
         var count = Mathf.CeilToInt(rate * duration);
         var data = new float[count];
         var rng = new System.Random(7);
+        var lp = 0f;
 
         for (var i = 0; i < count; i++)
         {
             var t = i / (float)rate;
-            var env = Mathf.Exp(-t * 120f);
-            data[i] = (float)(rng.NextDouble() * 2.0 - 1.0) * env * 0.6f;
+            var noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            lp += (noise - lp) * 0.6f;
+            // 金属撞击：高频噪声 + 一个短促的 2.4kHz 谐振
+            var ping = Mathf.Sin(2f * Mathf.PI * 2400f * t) * Mathf.Exp(-t * 90f) * 0.25f;
+            data[i] = Mathf.Clamp((lp * 0.7f + ping) * Mathf.Exp(-t * 70f), -1f, 1f);
         }
 
         var clip = AudioClip.Create("m0_click", count, 1, rate, false);

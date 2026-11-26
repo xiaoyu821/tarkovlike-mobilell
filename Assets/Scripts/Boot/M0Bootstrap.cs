@@ -310,17 +310,27 @@ public sealed class M0Bootstrap : MonoBehaviour
     {
         if (_player == null) return;
 
-        // 枪口闪光：屏幕下半部一团暖色，0.045s
+        // 枪口闪光：中心偏下的六芒星，50ms 内衰减。
+        // 之前是一整块半透明矩形，看起来像 UI 挡住屏幕，不像枪口。
         if (_player.MuzzleFlashActive)
         {
-            var w = Screen.width * 0.22f;
-            var h = Screen.height * 0.16f;
-            GUI.color = new Color(1f, 0.85f, 0.45f, 0.35f);
-            GUI.DrawTexture(new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height - h * 1.1f, w, h),
-                Texture2D.whiteTexture);
-            GUI.color = new Color(1f, 0.95f, 0.75f, 0.5f);
-            GUI.DrawTexture(new Rect(Screen.width * 0.5f - w * 0.2f, Screen.height - h * 0.85f, w * 0.4f, h * 0.45f),
-                Texture2D.whiteTexture);
+            var t = _player.MuzzleFlash01;
+            var cx = Screen.width * 0.5f;
+            var cy = Screen.height * 0.42f;
+            var len = Mathf.Lerp(10f, 62f, t);
+            var core = Mathf.Lerp(6f, 26f, t);
+
+            var saved = GUI.matrix;
+            GUI.color = new Color(1f, 0.82f, 0.45f, 0.55f * t);
+            for (var i = 0; i < 6; i++)
+            {
+                GUIUtility.RotateAroundPivot(i * 60f + 15f, new Vector2(cx, cy));
+                GUI.DrawTexture(new Rect(cx - 1.5f, cy - len, 3f, len + 6f), Texture2D.whiteTexture);
+            }
+            GUI.matrix = saved;
+
+            GUI.color = new Color(1f, 0.97f, 0.86f, 0.75f * t);
+            GUI.DrawTexture(new Rect(cx - core * 0.5f, cy - core * 0.5f, core, core), Texture2D.whiteTexture);
             GUI.color = Color.white;
         }
 
