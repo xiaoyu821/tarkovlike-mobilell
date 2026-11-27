@@ -113,6 +113,12 @@ public sealed class GameApp : MonoBehaviour
         _extractions.AddRange(builder.Extractions);
         ContainerTotal = builder.LootCount;
 
+        // 静态几何合批：200 多个方块否则就是一个方块一个 draw call
+        if (builder.StaticRoot != null)
+        {
+            StaticBatchingUtility.Combine(builder.StaticRoot.gameObject);
+        }
+
         Physics.SyncTransforms();
 
         // 进场先扣装备钱：这就是"带装备下本"的风险
@@ -183,14 +189,6 @@ public sealed class GameApp : MonoBehaviour
             var go = new GameObject("Scav" + i);
             go.transform.SetParent(_raidRoot.transform, false);
             go.transform.position = spawns[i];
-
-            var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            visual.name = "Body";
-            var visualCollider = visual.GetComponent<Collider>();
-            if (visualCollider != null) Destroy(visualCollider);
-            visual.transform.SetParent(go.transform, false);
-            visual.transform.localPosition = new Vector3(0f, 0.95f, 0f);
-            visual.transform.localScale = new Vector3(0.8f, 0.95f, 0.8f);
 
             var controller = go.AddComponent<CharacterController>();
             controller.height = 1.8f;

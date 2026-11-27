@@ -19,9 +19,7 @@ public sealed class LootContainer : MonoBehaviour
     private PlayerRig _searcher;
     private float _searchStart;
     private bool _searching;
-    private Renderer _renderer;
-    private Material _material;
-    private Color _baseColor = Color.white;
+    private Renderer[] _renderers;
 
     public static LootContainer CurrentSearch { get; private set; }
 
@@ -35,29 +33,22 @@ public sealed class LootContainer : MonoBehaviour
     public static LootContainer Spawn(Transform parent, Vector3 position, string tableId, string label,
         Color color, Vector3 size)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        go.name = "Loot_" + label;
+        var go = new GameObject("Loot_" + label);
         go.transform.SetParent(parent, false);
         go.transform.position = position;
         go.transform.localScale = size;
 
-        var renderer = go.GetComponent<Renderer>();
-        if (renderer != null)
-        {
-            renderer.sharedMaterial = Solid(color);
-        }
-
         // IL2CPP 会裁掉引擎内部 AddComponent 的碰撞体，这里显式要一次
-        if (go.GetComponent<BoxCollider>() == null)
-        {
-            go.AddComponent<BoxCollider>();
-        }
+        var collider = go.AddComponent<BoxCollider>();
+        collider.size = Vector3.one;
+
+        // 木箱 / 军械箱模型（边长 1，靠 localScale 缩放）
+        Art.BuildCrate(go.transform, tableId == "loot_weapon_crate");
 
         var container = go.AddComponent<LootContainer>();
         container._tableId = tableId;
         container.Label = label;
-        container._renderer = renderer;
-        container._baseColor = color;
+        container._renderers = go.GetComponentsInChildren<Renderer>();
 
         return container;
     }
@@ -133,14 +124,16 @@ public sealed class LootContainer : MonoBehaviour
 
         IsEmpty = true;
 
-        if (_material == null && _renderer != null)
+        // 搜过的箱子整体变暗（材质实例化一份，别影响别的箱子）
+        if (_renderers != null)
         {
-            _material = _renderer.material;
-        }
-
-        if (_material != null)
-        {
-            _material.color = _baseColor * 0.35f;
+            for (var i = 0; i < _renderers.Length; i++)
+            {
+                var renderer = _renderers[i];
+                if (renderer == null) continue;
+                var material = renderer.material;
+                material.color = material.color * 0.4f;
+            }
         }
 
         var catalog = GameDataBootstrap.Instance != null ? GameDataBootstrap.Instance.Catalog : null;

@@ -25,9 +25,7 @@ public sealed class EnemyScav : MonoBehaviour
 
     private GameApp _app;
     private CharacterController _controller;
-    private Renderer _renderer;
-    private Material _material;
-    private Color _baseColor = Color.white;
+    private Renderer[] _renderers;
 
     private AiState _state = AiState.Patrol;
     private Vector3 _home;
@@ -64,12 +62,9 @@ public sealed class EnemyScav : MonoBehaviour
         _stuckCheckTime = Time.time + 1f;
         _nextBurstTime = Time.time + Random.Range(0.4f, 1.2f);
 
-        _renderer = GetComponentInChildren<Renderer>();
-        if (_renderer != null)
-        {
-            _material = _renderer.material;
-            _material.color = color;
-        }
+        // 方块士兵模型：脚底在 y=0，总高 1.8，和 CharacterController 对齐
+        Art.BuildSoldier(transform);
+        _renderers = GetComponentsInChildren<Renderer>();
 
         _controller = GetComponent<CharacterController>();
     }
@@ -399,9 +394,12 @@ public sealed class EnemyScav : MonoBehaviour
         var collider = GetComponent<Collider>();
         if (collider != null) collider.enabled = false;
 
-        if (_renderer != null)
+        if (_renderers != null)
         {
-            _renderer.enabled = false;
+            for (var i = 0; i < _renderers.Length; i++)
+            {
+                if (_renderers[i] != null) _renderers[i].enabled = false;
+            }
         }
 
         Fx.PlayAt(transform.position, Fx.Death, 0.45f);

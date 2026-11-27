@@ -30,6 +30,7 @@ public sealed class PlayerRig : MonoBehaviour
     private CharacterController _controller;
     private Transform _camera;
     private Camera _cameraComponent;
+    private WeaponViewmodel _viewmodel;
     private TouchControls _controls;
     private GameApp _app;
     private AudioSource _audio;
@@ -76,6 +77,7 @@ public sealed class PlayerRig : MonoBehaviour
     private int _pellets = 1;
     private bool _weaponLoaded;
     private string _weaponName = "Viper-15";
+    private string _weaponId = "wpn_viper";
 
     private float _sensitivity = 0.13f;
 
@@ -151,6 +153,7 @@ public sealed class PlayerRig : MonoBehaviour
         _bandages = Mathf.Max(0, kit.Bandages);
         _reserve = Mathf.Max(0, kit.Reserve);
         EquipWeapon(kit.WeaponId);
+        _viewmodel = WeaponViewmodel.Create(_camera, _weaponId);
     }
 
     private void Update()
@@ -164,6 +167,7 @@ public sealed class PlayerRig : MonoBehaviour
         UpdateMovement(dt);
         UpdateAiming(dt);
         UpdateReload();
+        if (_viewmodel != null) _viewmodel.SetReloading(_reloading);
         UpdateHealing();
         UpdateFire();
         UpdateInteract();
@@ -263,6 +267,8 @@ public sealed class PlayerRig : MonoBehaviour
             _camera.localPosition = new Vector3(0f, 0.9f, 0f);
         }
 
+        if (_viewmodel != null) _viewmodel.gameObject.SetActive(false);
+
         Fx.Play2D(Fx.Death, 0.7f);
         Message?.Invoke(reason);
         _app?.OnPlayerDied();
@@ -317,7 +323,10 @@ public sealed class PlayerRig : MonoBehaviour
 
     private void UpdateLook(float dt)
     {
-        var look = _controls.ConsumeLookDelta() * _sensitivity * (Aiming ? 0.55f : 1f);
+        var rawLook = _controls.ConsumeLookDelta();
+        if (_viewmodel != null) _viewmodel.AddLook(rawLook);
+
+        var look = rawLook * _sensitivity * (Aiming ? 0.55f : 1f);
         _yaw += look.x;
         _pitch = Mathf.Clamp(_pitch - look.y, -85f, 85f);
 
@@ -355,6 +364,8 @@ public sealed class PlayerRig : MonoBehaviour
         {
             _stamina = Mathf.Min(1f, _stamina + StaminaRegen * dt * (magnitude < 0.1f ? 1.4f : 0.7f));
         }
+
+        if (_viewmodel != null) _viewmodel.SetMovement(magnitude, _sprinting);
 
         var speed = _sprinting ? SprintSpeed : WalkSpeed;
         if (Aiming) speed *= 0.55f;
@@ -409,6 +420,8 @@ public sealed class PlayerRig : MonoBehaviour
     private void UpdateAiming(float dt)
     {
         if (_cameraComponent == null) return;
+
+        if (_viewmodel != null) _viewmodel.SetAiming(Aiming);
 
         var target = Aiming ? AimFov : BaseFov;
         _cameraComponent.fieldOfView = Mathf.Lerp(_cameraComponent.fieldOfView, target, 12f * dt);
@@ -510,6 +523,7 @@ public sealed class PlayerRig : MonoBehaviour
         var barrel = _camera.position + forward * 0.55f + _camera.right * 0.17f - _camera.up * 0.16f;
         Fx.Tracer(barrel, endPoint, new Color(1f, 0.88f, 0.42f, 0.95f), 0.03f);
         Fx.Play2D(Fx.RandomShot, 0.62f);
+        if (_viewmodel != null) _viewmodel.Kick(1f);
 
         // 枪声会把附近的敌人引过来
         _app?.OnShotFired(transform.position);
@@ -632,6 +646,8 @@ public sealed class PlayerRig : MonoBehaviour
 
     private void EquipWeapon(string weaponId)
     {
+        _weaponId = string.IsNullOrEmpty(weaponId) ? "wpn_viper" : weaponId;
+
         var catalog = GameDataBootstrap.Instance != null ? GameDataBootstrap.Instance.Catalog : null;
 
         if (catalog == null || catalog.Weapons.Count == 0)

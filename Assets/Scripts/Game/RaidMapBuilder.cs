@@ -14,6 +14,7 @@ public sealed class RaidMapBuilder
     public Vector3 PlayerSpawn { get; private set; }
     public float PlayerYaw { get; private set; }
     public int LootCount { get; private set; }
+    public Transform StaticRoot { get; private set; }
 
     public readonly List<Vector3> EnemySpawns = new List<Vector3>();
     public readonly List<ExtractionZone> Extractions = new List<ExtractionZone>();
@@ -46,6 +47,10 @@ public sealed class RaidMapBuilder
         Extractions.Clear();
         LootCount = 0;
 
+        var staticGo = new GameObject("Static");
+        staticGo.transform.SetParent(root, false);
+        StaticRoot = staticGo.transform;
+
         CreateMaterials();
 
         BuildGroundAndWalls();
@@ -61,11 +66,12 @@ public sealed class RaidMapBuilder
 
     private void CreateMaterials()
     {
-        _groundMaterial = Solid(new Color(0.19f, 0.2f, 0.21f));
-        _wallMaterial = Solid(new Color(0.33f, 0.33f, 0.34f));
-        _coverMaterial = Solid(new Color(0.38f, 0.35f, 0.3f));
-        _crateMaterial = Solid(new Color(0.48f, 0.37f, 0.21f));
-        _extractMaterial = Solid(new Color(0.2f, 0.62f, 0.34f));
+        // CC0 贴图材质（Resources/Textures），拿不到贴图时自动退化成纯色
+        _groundMaterial = Art.Ground;
+        _wallMaterial = Art.Wall;
+        _coverMaterial = Art.MetalDark;
+        _crateMaterial = Art.Wood;
+        _extractMaterial = Art.Metal;
     }
 
     private void BuildGroundAndWalls()
@@ -98,7 +104,8 @@ public sealed class RaidMapBuilder
         Extractions.Add(zone);
 
         // 地面上的绿盘 + 四根柱子，远远就能认出来
-        AddBox(center + new Vector3(0f, 0.04f, 0f), new Vector3(9f, 0.08f, 9f), _extractMaterial, "ExtractPad");
+        AddBox(center + new Vector3(0f, 0.04f, 0f), new Vector3(9f, 0.08f, 9f), Art.Beacon, "ExtractPad");
+        Art.BuildBeacon(StaticRoot, center);
         var corners = new[]
         {
             new Vector3(-4.2f, 0f, -4.2f), new Vector3(4.2f, 0f, -4.2f),
@@ -352,7 +359,7 @@ public sealed class RaidMapBuilder
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = name;
-        go.transform.SetParent(_root, false);
+        go.transform.SetParent(StaticRoot, false);
         go.transform.position = center;
         go.transform.localScale = size;
 
