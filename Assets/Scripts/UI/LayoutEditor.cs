@@ -33,11 +33,33 @@ public sealed class LayoutEditor : MonoBehaviour
         if (_instance == null) return;
 
         var app = _instance._app;
-        _instance.gameObject.SetActive(false);
-        Destroy(_instance.gameObject);
+        var editor = _instance;
+
+        // 触屏层是独立根节点，必须显式销毁，否则会一直浮在主菜单/游戏上面
+        editor.DestroyControls();
+
+        editor.gameObject.SetActive(false);
+        Destroy(editor.gameObject);
         _instance = null;
 
         if (app != null) app.ShowMenu();
+    }
+
+    private void DestroyControls()
+    {
+        if (_controlsRoot != null)
+        {
+            _controlsRoot.SetActive(false);
+            Destroy(_controlsRoot);
+            _controlsRoot = null;
+        }
+
+        _controls = null;
+    }
+
+    private void OnDestroy()
+    {
+        DestroyControls();
     }
 
     private void Build()

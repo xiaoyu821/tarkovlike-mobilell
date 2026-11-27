@@ -1,5 +1,16 @@
 using UnityEngine;
 
+/// <summary>开镜时隐藏的部件（枪托会捅到镜头里，挡视线）。</summary>
+public sealed class ViewmodelHideOnAim : MonoBehaviour
+{
+}
+
+/// <summary>记录这把枪的机械瞄具高度（准星线相对枪根的高度），开镜时按它对齐屏幕中心。</summary>
+public sealed class ViewmodelSight : MonoBehaviour
+{
+    public float Height = 0.085f;
+}
+
 /// <summary>
 /// 美术层：CC0 贴图（ambientCG）+ 代码内拼的低多边形模型。
 /// 没有任何 .fbx/.blend：模型全部由方块和圆柱在运行时拼出来，
@@ -183,22 +194,29 @@ public static class Art
         var root = new GameObject("Viewmodel");
         root.transform.SetParent(parent, false);
 
+        var sight = root.AddComponent<ViewmodelSight>();
+
         switch (weaponId)
         {
             case "wpn_p9":
                 BuildPistol(root.transform);
+                sight.Height = 0.072f;
                 break;
             case "wpn_wasp":
                 BuildSmg(root.transform);
+                sight.Height = 0.082f;
                 break;
             case "wpn_mule12":
                 BuildShotgun(root.transform);
+                sight.Height = 0.066f;
                 break;
             case "wpn_kestrel74":
                 BuildRifle(root.transform, 1.1f);
+                sight.Height = 0.086f;
                 break;
             default:
                 BuildRifle(root.transform, 1f);
+                sight.Height = 0.086f;
                 break;
         }
 
@@ -224,12 +242,17 @@ public static class Art
         // 握把
         Box(root, "Grip", new Vector3(0f, -0.095f, -0.045f), new Vector3(0.038f, 0.11f, 0.05f),
             GunPolymer, new Vector3(16f, 0f, 0f));
-        // 枪托
-        Box(root, "Stock", new Vector3(0f, -0.012f, -0.20f), new Vector3(0.045f, 0.07f, 0.20f), GunMetal);
+        // 枪托（开镜时隐藏，否则会糊在镜头前）
+        var stock = Box(root, "Stock", new Vector3(0f, -0.012f, -0.20f), new Vector3(0.045f, 0.07f, 0.20f), GunMetal);
+        stock.AddComponent<ViewmodelHideOnAim>();
         // 导轨 + 机械瞄具
         Box(root, "Rail", new Vector3(0f, 0.052f, 0.04f), new Vector3(0.028f, 0.014f, 0.34f), GunMetal);
-        Box(root, "RearSight", new Vector3(0f, 0.072f, -0.08f), new Vector3(0.02f, 0.03f, 0.02f), Black);
-        Box(root, "FrontSight", new Vector3(0f, 0.072f, 0.24f * lengthScale), new Vector3(0.014f, 0.03f, 0.014f), Black);
+        // 机械瞄具：后照门留缺口，准星柱在正中，开镜时正好套在屏幕中心
+        Box(root, "RearBase", new Vector3(0f, 0.058f, -0.06f), new Vector3(0.055f, 0.009f, 0.02f), GunMetal);
+        Box(root, "RearLeft", new Vector3(-0.015f, 0.078f, -0.06f), new Vector3(0.009f, 0.032f, 0.012f), Black);
+        Box(root, "RearRight", new Vector3(0.015f, 0.078f, -0.06f), new Vector3(0.009f, 0.032f, 0.012f), Black);
+        Box(root, "FrontBase", new Vector3(0f, 0.058f, 0.24f * lengthScale), new Vector3(0.03f, 0.009f, 0.02f), GunMetal);
+        Box(root, "FrontPost", new Vector3(0f, 0.082f, 0.24f * lengthScale), new Vector3(0.007f, 0.028f, 0.01f), Black);
     }
 
     private static void BuildSmg(Transform root)
@@ -242,8 +265,12 @@ public static class Art
             GunPolymer, new Vector3(-4f, 0f, 0f));
         Box(root, "Grip", new Vector3(0f, -0.09f, -0.05f), new Vector3(0.036f, 0.10f, 0.048f),
             GunPolymer, new Vector3(16f, 0f, 0f));
-        Box(root, "Stock", new Vector3(0f, -0.005f, -0.16f), new Vector3(0.03f, 0.05f, 0.14f), GunMetal);
+        var smgStock = Box(root, "Stock", new Vector3(0f, -0.005f, -0.16f), new Vector3(0.03f, 0.05f, 0.14f), GunMetal);
+        smgStock.AddComponent<ViewmodelHideOnAim>();
         Box(root, "Rail", new Vector3(0f, 0.05f, 0.02f), new Vector3(0.024f, 0.012f, 0.24f), GunMetal);
+        Box(root, "RearLeft", new Vector3(-0.013f, 0.074f, -0.04f), new Vector3(0.008f, 0.03f, 0.01f), Black);
+        Box(root, "RearRight", new Vector3(0.013f, 0.074f, -0.04f), new Vector3(0.008f, 0.03f, 0.01f), Black);
+        Box(root, "FrontPost", new Vector3(0f, 0.078f, 0.16f), new Vector3(0.006f, 0.026f, 0.008f), Black);
     }
 
     private static void BuildShotgun(Transform root)
@@ -252,9 +279,11 @@ public static class Art
         Cylinder(root, "Barrel", new Vector3(0f, 0.022f, 0.36f), 0.030f, 0.62f, GunMetal, new Vector3(90f, 0f, 0f));
         Cylinder(root, "Tube", new Vector3(0f, -0.018f, 0.30f), 0.026f, 0.50f, Black, new Vector3(90f, 0f, 0f));
         Box(root, "Pump", new Vector3(0f, -0.018f, 0.26f), new Vector3(0.055f, 0.055f, 0.16f), GunWood);
-        Box(root, "Stock", new Vector3(0f, -0.02f, -0.24f), new Vector3(0.05f, 0.09f, 0.24f), GunWood);
+        var sgStock = Box(root, "Stock", new Vector3(0f, -0.02f, -0.24f), new Vector3(0.05f, 0.09f, 0.24f), GunWood);
+        sgStock.AddComponent<ViewmodelHideOnAim>();
         Box(root, "Grip", new Vector3(0f, -0.075f, -0.055f), new Vector3(0.036f, 0.09f, 0.05f),
             GunWood, new Vector3(14f, 0f, 0f));
+        Box(root, "FrontPost", new Vector3(0f, 0.064f, 0.60f), new Vector3(0.008f, 0.01f, 0.008f), Black);
     }
 
     private static void BuildPistol(Transform root)
@@ -264,8 +293,9 @@ public static class Art
         Box(root, "Grip", new Vector3(0f, -0.10f, -0.03f), new Vector3(0.032f, 0.14f, 0.06f),
             GunPolymer, new Vector3(14f, 0f, 0f));
         Cylinder(root, "Barrel", new Vector3(0f, 0.028f, 0.17f), 0.014f, 0.04f, Black, new Vector3(90f, 0f, 0f));
-        Box(root, "RearSight", new Vector3(0f, 0.062f, -0.02f), new Vector3(0.026f, 0.012f, 0.012f), Black);
-        Box(root, "FrontSight", new Vector3(0f, 0.062f, 0.14f), new Vector3(0.010f, 0.012f, 0.010f), Black);
+        Box(root, "RearLeft", new Vector3(-0.011f, 0.064f, -0.02f), new Vector3(0.006f, 0.016f, 0.01f), Black);
+        Box(root, "RearRight", new Vector3(0.011f, 0.064f, -0.02f), new Vector3(0.006f, 0.016f, 0.01f), Black);
+        Box(root, "FrontPost", new Vector3(0f, 0.066f, 0.14f), new Vector3(0.005f, 0.014f, 0.008f), Black);
     }
 
     // ---------- Scav 士兵 ----------

@@ -135,6 +135,11 @@ public sealed class MenuUi : MonoBehaviour
             new Vector2(200f, 52f), new Color(1f, 1f, 1f, 0.06f), new Color(0.85f, 0.88f, 0.92f), 20,
             () => LayoutEditor.Show(_app));
 
+        // ---- 开镜方式 ----
+        UiKit.TextButton(root, "AimModeButton", profile.AimMode == 0 ? "开镜：按住" : "开镜：点击", V(0f, 1f),
+            V(0f, 1f), new Vector2(340f, -790f), new Vector2(220f, 52f), new Color(1f, 1f, 1f, 0.06f),
+            new Color(0.85f, 0.88f, 0.92f), 20, ToggleAimMode);
+
         // ---- 底部左 ----
         UiKit.TextButton(root, "ResetButton", "重置存档", V(0f, 0f), V(0f, 0f), new Vector2(120f, 26f),
             new Vector2(160f, 50f), new Color(1f, 1f, 1f, 0.06f), new Color(0.85f, 0.55f, 0.5f), 20,
@@ -179,7 +184,7 @@ public sealed class MenuUi : MonoBehaviour
             new Color(0.55f, 0.58f, 0.63f), false);
 
         // ---- 版本 ----
-        UiKit.Label(root, "Version", "v0.3   ·   1 人 + AI   ·   无美术资源：模型与界面全部代码生成", 17,
+        UiKit.Label(root, "Version", "v0.4   ·   1 人 + AI   ·   无美术资源：模型与界面全部代码生成", 17,
             TextAnchor.LowerRight, V(1f, 0f), V(1f, 0f), new Vector2(-120f, 16f), new Vector2(740f, 26f),
             new Color(0.42f, 0.45f, 0.5f), false);
     }
@@ -375,6 +380,15 @@ public sealed class MenuUi : MonoBehaviour
     private static string FormatSensitivity(MetaProfile profile)
     {
         return (profile.Sensitivity / 0.13f).ToString("0.00") + "×";
+    }
+
+    private void ToggleAimMode()
+    {
+        if (_app == null) return;
+
+        _app.Profile.AimMode = _app.Profile.AimMode == 0 ? 1 : 0;
+        _app.Profile.Save();
+        ShowMainMenu(_app);
     }
 
     private void CycleFps()

@@ -60,6 +60,8 @@ public sealed class PlayerRig : MonoBehaviour
     private float _nextFireTime;
     private float _reloadEndTime;
     private bool _reloading;
+    private int _aimMode;
+    private bool _aimToggled;
     private bool _reloadInitiatedByPlayer;
     private float _nextDryFireTime;
     private float _flashUntil;
@@ -115,7 +117,8 @@ public sealed class PlayerRig : MonoBehaviour
     public bool DamageFlashActive => Time.time < _damageFlashUntil;
     public float DamageFlash01 => Mathf.Clamp01((_damageFlashUntil - Time.time) / 0.5f);
     public Vector3 LastDamageFrom => _damageFrom;
-    public bool Aiming => _controls != null && _controls.AimHeld && !_sprinting;
+    public bool Aiming =>
+        _controls != null && !_sprinting && (_aimMode == 1 ? _aimToggled : _controls.AimHeld);
     public bool Grounded => _controller != null && _controller.isGrounded;
     public float GroundY => _groundY;
     public Vector3 CameraPosition => _camera != null ? _camera.position : transform.position;
@@ -127,6 +130,8 @@ public sealed class PlayerRig : MonoBehaviour
         _app = app;
         _sensitivity = Mathf.Clamp(sensitivity, 0.04f, 0.5f);
         _controller = GetComponent<CharacterController>();
+
+        _aimMode = app != null && app.Profile != null ? app.Profile.AimMode : 0;
 
         var childCamera = GetComponentInChildren<Camera>();
         if (childCamera != null)
@@ -161,6 +166,18 @@ public sealed class PlayerRig : MonoBehaviour
         if (_controls == null || !IsAlive) return;
 
         var dt = Mathf.Min(Time.deltaTime, 0.05f);
+
+        // 开镜：按住模式直接用 AimHeld，切换模式点一下保持
+        if (_controls.ConsumeAimPress() && _aimMode == 1)
+        {
+            _aimToggled = !_aimToggled;
+        }
+
+        // 切换模式下想冲刺就自动放镜（否则 Aiming 会一直挡住冲刺）
+        if (_aimToggled && _controls.SprintHeld && _controls.Move.sqrMagnitude > 0.16f)
+        {
+            _aimToggled = false;
+        }
 
         UpdateStatusEffects(dt);
         UpdateLook(dt);

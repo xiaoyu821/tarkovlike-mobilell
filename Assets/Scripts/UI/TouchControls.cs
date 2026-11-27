@@ -70,6 +70,7 @@ public sealed class TouchControls : MonoBehaviour
     public bool ConsumeHeal() => _inputEnabled && _heal != null && _heal.Consume();
     public bool ConsumeReload() => _inputEnabled && _reload != null && _reload.Consume();
     public bool ConsumeBackpack() => _inputEnabled && _backpack != null && _backpack.Consume();
+    public bool ConsumeAimPress() => _inputEnabled && _aim != null && _aim.ConsumePress();
 
     internal void AddLook(Vector2 delta)
     {
@@ -301,11 +302,21 @@ public sealed class TouchControls : MonoBehaviour
 
     private sealed class HoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
+        private bool _pressed;
+
         public bool Held { get; private set; }
+
+        public bool ConsumePress()
+        {
+            var value = _pressed;
+            _pressed = false;
+            return value;
+        }
 
         public void OnPointerDown(PointerEventData eventData)
         {
             Held = true;
+            _pressed = true;
         }
 
         public void OnPointerUp(PointerEventData eventData)

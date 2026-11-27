@@ -17,6 +17,7 @@ public sealed class MetaProfile
     public float Sensitivity = 0.13f;
     public int SelectedKit = 1;
     public int TargetFps = 60;
+    public int AimMode; // 0 = 按住开镜，1 = 点击切换
     public bool FirstRunDone;
 
     /// <summary>可选帧率档位，最高 165（需要高刷屏才有意义）。</summary>

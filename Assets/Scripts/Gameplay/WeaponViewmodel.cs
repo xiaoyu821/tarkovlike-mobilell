@@ -7,7 +7,8 @@ using UnityEngine;
 public sealed class WeaponViewmodel : MonoBehaviour
 {
     private static readonly Vector3 HipPosition = new Vector3(0.17f, -0.155f, 0.42f);
-    private static readonly Vector3 AimPosition = new Vector3(0.006f, -0.062f, 0.30f);
+    // 开镜位置按这把枪的机瞄高度算，保证准星线正好落在屏幕中心
+    private Vector3 _aimPosition = new Vector3(0f, -0.086f, 0.30f);
     private static readonly Vector3 SprintOffset = new Vector3(0.03f, -0.075f, -0.03f);
 
     private Transform _model;
@@ -21,6 +22,8 @@ public sealed class WeaponViewmodel : MonoBehaviour
     private float _kick;
     private float _reloadDip;
     private float _moveAmount;
+    private ViewmodelHideOnAim[] _hideOnAim = new ViewmodelHideOnAim[0];
+    private bool _hiddenApplied;
     private bool _aiming;
     private bool _reloading;
     private bool _sprinting;
@@ -49,6 +52,11 @@ public sealed class WeaponViewmodel : MonoBehaviour
 
         var model = Art.BuildViewmodel(transform, weaponId);
         _model = model.transform;
+
+        var sight = model.GetComponent<ViewmodelSight>();
+        if (sight != null) _aimPosition = new Vector3(0f, -sight.Height, 0.32f);
+
+        _hideOnAim = model.GetComponentsInChildren<ViewmodelHideOnAim>(true);
 
         // 枪不能投影：0.4 米外的模型打阴影会在屏幕上糊一片
         var renderers = model.GetComponentsInChildren<MeshRenderer>();
@@ -92,19 +100,31 @@ public sealed class WeaponViewmodel : MonoBehaviour
         var dt = Mathf.Min(Time.deltaTime, 0.05f);
 
         // 1) 位置：腰射 ↔ 开镜，叠加走路晃动和拖拽滞后
-        var target = _aiming ? AimPosition : _basePosition;
+        var target = _aiming ? _aimPosition : _basePosition;
 
         _bobTime += dt * Mathf.Lerp(5f, 10f, _moveAmount) * (_sprinting ? 1.35f : 1f);
-        var bobStrength = Mathf.Lerp(0.0015f, 0.011f, _moveAmount) * (_aiming ? 0.3f : 1f);
+        var bobStrength = Mathf.Lerp(0.0015f, 0.011f, _moveAmount) * (_aiming ? 0.1f : 1f);
         var bobX = Mathf.Sin(_bobTime) * bobStrength;
         var bobY = Mathf.Abs(Mathf.Cos(_bobTime)) * bobStrength * 0.7f;
 
         _lookSway = Vector2.Lerp(_lookSway, Vector2.zero, 7f * dt);
-        var swayX = Mathf.Clamp(-_lookSway.x * 0.00035f, -0.028f, 0.028f);
-        var swayY = Mathf.Clamp(-_lookSway.y * 0.00035f, -0.02f, 0.02f);
+        var swayScale = _aiming ? 0.12f : 1f;
+        var swayX = Mathf.Clamp(-_lookSway.x * 0.00035f, -0.028f, 0.028f) * swayScale;
+        var swayY = Mathf.Clamp(-_lookSway.y * 0.00035f, -0.02f, 0.02f) * swayScale;
 
-        _current = Vector3.Lerp(_current, target + new Vector3(bobX + swayX, bobY + swayY, 0f), 9f * dt);
+        var follow = _aiming ? 15f : 9f;
+        _current = Vector3.Lerp(_current, target + new Vector3(bobX + swayX, bobY + swayY, 0f), follow * dt);
         transform.localPosition = _current;
+
+        // 开镜时把枪托收起来，不然会顶到镜头前挡视线
+        if (_aiming != _hiddenApplied)
+        {
+            _hiddenApplied = _aiming;
+            for (var i = 0; i < _hideOnAim.Length; i++)
+            {
+                if (_hideOnAim[i] != null) _hideOnAim[i].gameObject.SetActive(!_aiming);
+            }
+        }
 
         // 2) 模型：后坐 + 换弹 + 冲刺
         _kick = Mathf.MoveTowards(_kick, 0f, 5f * dt);
