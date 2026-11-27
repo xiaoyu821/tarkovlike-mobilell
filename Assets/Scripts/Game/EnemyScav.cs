@@ -45,6 +45,7 @@ public sealed class EnemyScav : MonoBehaviour
     private float _stuckCheckTime;
     private float _detourUntil;
     private float _nextStepSound;
+    private float _nextGeometryProbe;
 
     public bool IsAlive => _state != AiState.Dead && _health > 0f;
     public Vector3 AimPoint => transform.position + Vector3.up * 1.15f;
@@ -61,11 +62,18 @@ public sealed class EnemyScav : MonoBehaviour
         _stuckCheckTime = Time.time + 1f;
         _nextBurstTime = Time.time + Random.Range(0.4f, 1.2f);
 
-        // 方块士兵模型：脚底在 y=0，总高 1.8，和 CharacterController 对齐
-        Art.BuildSoldier(transform);
+        _controller = GetComponent<CharacterController>();
+
+        // 方块士兵模型：脚底在 y=0，总高 1.8，和 CharacterController 对齐。
+        // CharacterController 的 skinWidth 会让胶囊底离地 8cm，模型要往下补偿这么多，
+        // 否则看起来就是"悬在地面上"。
+        var body = Art.BuildSoldier(transform);
+        var skin = _controller != null ? _controller.skinWidth : 0.08f;
+        body.transform.localPosition = new Vector3(0f, -skin, 0f);
+
         _renderers = GetComponentsInChildren<Renderer>();
 
-        _controller = GetComponent<CharacterController>();
+        SnapToGround();
     }
 
     private void OnEnable()
@@ -83,6 +91,11 @@ public sealed class EnemyScav : MonoBehaviour
         if (_state == AiState.Dead || _app == null) return;
 
         var dt = Mathf.Min(Time.deltaTime, 0.05f);
+
+        // 重力每帧都生效（以前只在移动时才有，站着不动就悬在半空）
+        ApplyGravity(dt);
+        CheckStuckInGeometry();
+
         var seesPlayer = CanSeePlayer(out var playerChest);
 
         if (seesPlayer)
@@ -287,9 +300,12 @@ public sealed class EnemyScav : MonoBehaviour
             direction = _detourDirection;
         }
 
+        // 贴墙滑行：前方有墙就沿墙面走，别一头撞上去卡死
+        direction = AvoidWalls(direction, toTarget);
+
         if (_controller != null && _controller.enabled)
         {
-            _controller.Move((direction * speed + Vector3.down * 9.81f) * dt);
+            _controller.Move(direction * speed * dt);
         }
 
         // 卡住检测：1 秒内几乎没动就横着绕一下
@@ -310,6 +326,96 @@ public sealed class EnemyScav : MonoBehaviour
         {
             _nextStepSound = Time.time + 0.42f;
             Fx.PlayAt(transform.position, Fx.Step, 0.35f);
+        }
+    }
+
+    private void ApplyGravity(float dt)
+    {
+        if (_controller == null || !_controller.enabled) return;
+        if (_controller.isGrounded) return;
+
+        _controller.Move(Vector3.down * 9.81f * dt);
+    }
+
+    private void SnapToGround()
+    {
+        var ground = Art.GroundY(transform.position);
+        var position = transform.position;
+
+        if (Mathf.Abs(position.y - ground) < 0.02f) return;
+
+        position.y = ground;
+
+        if (_controller != null) _controller.enabled = false;
+        transform.position = position;
+        if (_controller != null) _controller.enabled = true;
+        Physics.SyncTransforms();
+    }
+
+    /// <summary>
+    /// 前方 1.6 米内有墙就沿着墙面走。之前是一头撞墙站在原地，
+    /// 玩家看到的是半个身子嵌进墙里的敌人，还打不到。
+    /// </summary>
+    private Vector3 AvoidWalls(Vector3 direction, Vector3 toTarget)
+    {
+        var origin = transform.position + Vector3.up * 0.95f;
+
+        if (!Physics.SphereCast(origin, 0.34f, direction, out var hit, 1.6f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            return direction;
+        }
+
+        if (hit.collider == null) return direction;
+        if (hit.collider.GetComponentInParent<PlayerRig>() != null) return direction;
+        if (hit.collider.GetComponentInParent<EnemyScav>() != null) return direction;
+
+        var tangent = Vector3.ProjectOnPlane(direction, hit.normal);
+        if (tangent.sqrMagnitude < 0.0004f)
+        {
+            tangent = Vector3.Cross(Vector3.up, hit.normal);
+        }
+
+        tangent.Normalize();
+        if (Vector3.Dot(tangent, toTarget) < 0f) tangent = -tangent;
+
+        // 稍微离开墙面一点，避免贴着墙摩擦
+        return (tangent * 0.92f + hit.normal * 0.28f).normalized;
+    }
+
+    /// <summary>
+    /// 真被挤进几何体里时（碰撞体互相推挤），抬到它顶上再落下来。
+    /// </summary>
+    private void CheckStuckInGeometry()
+    {
+        if (Time.time < _nextGeometryProbe) return;
+        _nextGeometryProbe = Time.time + 0.5f;
+
+        var bottom = transform.position + Vector3.up * 0.45f;
+        var top = transform.position + Vector3.up * 1.35f;
+        var overlaps = Physics.OverlapCapsule(bottom, top, 0.28f, ~0, QueryTriggerInteraction.Ignore);
+        if (overlaps.Length == 0) return;
+
+        var chest = transform.position + Vector3.up * 0.9f;
+
+        for (var i = 0; i < overlaps.Length; i++)
+        {
+            var collider = overlaps[i];
+            if (collider == null) continue;
+            if (collider == _controller) continue;
+            if (collider.GetComponentInParent<EnemyScav>() != null) continue;
+            if (collider.GetComponentInParent<PlayerRig>() != null) continue;
+            if (!collider.bounds.Contains(chest)) continue;
+
+            var position = transform.position;
+            position.y = collider.bounds.max.y + 0.3f;
+
+            if (_controller != null) _controller.enabled = false;
+            transform.position = position;
+            if (_controller != null) _controller.enabled = true;
+            Physics.SyncTransforms();
+
+            _stuckPosition = position;
+            return;
         }
     }
 

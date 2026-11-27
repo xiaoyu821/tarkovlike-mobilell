@@ -63,6 +63,18 @@ public static class Art
         }
     }
 
+    /// <summary>从上方往下打射线找地面高度。生成任何东西之前都用它对齐，避免悬空。</summary>
+    public static float GroundY(Vector3 position)
+    {
+        var origin = new Vector3(position.x, position.y + 8f, position.z);
+        if (Physics.Raycast(origin, Vector3.down, out var hit, 40f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            return hit.point.y;
+        }
+
+        return 0f;
+    }
+
     // ---------- 基础构件 ----------
 
     private static Mesh GrabMesh(PrimitiveType type)

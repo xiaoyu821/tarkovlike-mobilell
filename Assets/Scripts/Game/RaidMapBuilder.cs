@@ -312,7 +312,7 @@ public sealed class RaidMapBuilder
     private void PlacePlayerSpawn()
     {
         var spawn = new Vector3(0f, 0.2f, -MapHalf + 6f);
-        spawn.y = Mathf.Max(0.2f, SampleGroundY(spawn.x, spawn.z) + 0.15f);
+        spawn.y = SampleGroundY(spawn.x, spawn.z) + 0.03f;
         PlayerSpawn = spawn;
         PlayerYaw = 0f;
     }
@@ -332,7 +332,15 @@ public sealed class RaidMapBuilder
             if (OverlapsAny(rect, _buildings, 1.5f)) continue;
             if (OverlapsAny(rect, _reserved, 1f)) continue;
 
-            var point = new Vector3(x, Mathf.Max(0.2f, SampleGroundY(x, z) + 0.15f), z);
+            var point = new Vector3(x, SampleGroundY(x, z) + 0.05f, z);
+
+            // 别把敌人生成在箱子里/墙缝里（否则一开局就卡住打不到）
+            if (Physics.CheckCapsule(point + Vector3.up * 0.45f, point + Vector3.up * 1.35f, 0.4f,
+                    ~0, QueryTriggerInteraction.Ignore))
+            {
+                continue;
+            }
+
             EnemySpawns.Add(point);
         }
 

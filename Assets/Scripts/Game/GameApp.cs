@@ -186,9 +186,12 @@ public sealed class GameApp : MonoBehaviour
 
         for (var i = 0; i < spawns.Count; i++)
         {
+            // 出生点按地面重新对齐：之前直接用 SampleGroundY + 0.15，
+            // 敌人一落地就悬在半空，加上阴影看起来像飘着
+            var ground = Art.GroundY(spawns[i]);
             var go = new GameObject("Scav" + i);
             go.transform.SetParent(_raidRoot.transform, false);
-            go.transform.position = spawns[i];
+            go.transform.position = new Vector3(spawns[i].x, ground, spawns[i].z);
 
             var controller = go.AddComponent<CharacterController>();
             controller.height = 1.8f;

@@ -505,7 +505,9 @@ public sealed class PlayerRig : MonoBehaviour
             direction = ApplyAimAssist(origin, direction);
 
             var pelletEnd = origin + direction * 140f;
-            if (Physics.Raycast(origin, direction, out var hit, 200f, ~0, QueryTriggerInteraction.Ignore))
+            // 球形扫描（半径 6cm）：贴着掩体边缘的敌人也能打中，
+            // 纯射线经常会从模型缝隙里穿过去
+            if (Physics.SphereCast(origin, 0.06f, direction, out var hit, 200f, ~0, QueryTriggerInteraction.Ignore))
             {
                 pelletEnd = hit.point;
                 hitAnything = true;

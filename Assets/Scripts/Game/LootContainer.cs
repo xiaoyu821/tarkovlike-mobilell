@@ -35,7 +35,9 @@ public sealed class LootContainer : MonoBehaviour
     {
         var go = new GameObject("Loot_" + label);
         go.transform.SetParent(parent, false);
-        go.transform.position = position;
+        // 不管调用方传什么 y，一律按地面重新贴一次，避免箱子/尸体悬空
+        var ground = Art.GroundY(position);
+        go.transform.position = new Vector3(position.x, ground + size.y * 0.5f, position.z);
         go.transform.localScale = size;
 
         // IL2CPP 会裁掉引擎内部 AddComponent 的碰撞体，这里显式要一次
