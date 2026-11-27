@@ -7,7 +7,7 @@ using UnityEngine;
 public sealed class WeaponViewmodel : MonoBehaviour
 {
     private static readonly Vector3 HipPosition = new Vector3(0.17f, -0.155f, 0.42f);
-    private static readonly Vector3 AimPosition = new Vector3(0.055f, -0.085f, 0.34f);
+    private static readonly Vector3 AimPosition = new Vector3(0.006f, -0.062f, 0.30f);
     private static readonly Vector3 SprintOffset = new Vector3(0.03f, -0.075f, -0.03f);
 
     private Transform _model;

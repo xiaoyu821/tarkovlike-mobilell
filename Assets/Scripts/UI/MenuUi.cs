@@ -17,6 +17,7 @@ public sealed class MenuUi : MonoBehaviour
     private GameApp _app;
     private Canvas _canvas;
     private Text _sensitivityText;
+    private Text _fpsText;
 
     private static MenuUi _instance;
 
@@ -65,8 +66,6 @@ public sealed class MenuUi : MonoBehaviour
         UiKit.Background(root, UiKit.Gradient, Color.white);
         UiKit.Panel(root, "TopAccent", V(0f, 1f), V(0f, 1f), Vector2.zero, new Vector2(2600f, 4f),
             new Color(0.88f, 0.55f, 0.16f, 0.95f), false);
-        UiKit.Panel(root, "TopFade", V(0f, 1f), V(0f, 1f), new Vector2(0f, -4f), new Vector2(2600f, 150f),
-            new Color(0f, 0f, 0f, 0.25f), false);
         UiKit.Panel(root, "BottomBar", V(0f, 0f), V(0f, 0f), Vector2.zero, new Vector2(2600f, 92f),
             new Color(0f, 0f, 0f, 0.32f), false);
 
@@ -89,7 +88,7 @@ public sealed class MenuUi : MonoBehaviour
         }
 
         // ---- 简报 ----
-        var brief = UiKit.Panel(root, "Brief", V(0f, 1f), V(0f, 1f), new Vector2(120f, -272f),
+        var brief = UiKit.Panel(root, "Brief", V(0f, 1f), V(0f, 1f), new Vector2(120f, -418f),
             new Vector2(880f, 104f), new Color(1f, 1f, 1f, 0.035f), true);
 
         CardLabel(brief, "BriefTitle", "突袭简报", 19, 18f, 12f, 300f, 26f, new Color(0.6f, 0.64f, 0.7f), true);
@@ -100,24 +99,41 @@ public sealed class MenuUi : MonoBehaviour
 
         // ---- 开始 ----
         UiKit.TextButton(root, "StartButton", "进 入 突 袭", V(0f, 1f), V(0f, 1f),
-            new Vector2(120f, -396f), new Vector2(430f, 96f), new Color(0.78f, 0.31f, 0.15f, 1f),
+            new Vector2(120f, -540f), new Vector2(430f, 96f), new Color(0.78f, 0.31f, 0.15f, 1f),
             Color.white, 40, () => { if (_app != null) _app.StartRaid(); });
 
         // ---- 灵敏度 ----
         TopLabel("SensLabel", "视角灵敏度", 20, TextAnchor.MiddleLeft, 120f, -514f, 150f, 52f,
             new Color(0.7f, 0.73f, 0.78f), false);
 
-        UiKit.TextButton(root, "SensDown", "－", V(0f, 1f), V(0f, 1f), new Vector2(272f, -514f),
+        UiKit.TextButton(root, "SensDown", "－", V(0f, 1f), V(0f, 1f), new Vector2(272f, -662f),
             new Vector2(52f, 52f), new Color(1f, 1f, 1f, 0.09f), Color.white, 32,
             () => ChangeSensitivity(-0.02f));
 
         _sensitivityText = UiKit.Label(root, "SensValue", FormatSensitivity(profile), 21, TextAnchor.MiddleCenter,
-            V(0f, 1f), V(0f, 1f), new Vector2(332f, -514f), new Vector2(104f, 52f),
+            V(0f, 1f), V(0f, 1f), new Vector2(332f, -662f), new Vector2(104f, 52f),
             new Color(0.9f, 0.92f, 0.95f), true);
 
-        UiKit.TextButton(root, "SensUp", "＋", V(0f, 1f), V(0f, 1f), new Vector2(444f, -514f),
+        UiKit.TextButton(root, "SensUp", "＋", V(0f, 1f), V(0f, 1f), new Vector2(444f, -662f),
             new Vector2(52f, 52f), new Color(1f, 1f, 1f, 0.09f), Color.white, 32,
             () => ChangeSensitivity(0.02f));
+
+        // ---- 帧率 ----
+        TopLabel("FpsLabel", "帧率上限", 20, TextAnchor.MiddleLeft, 120f, -726f, 150f, 52f,
+            new Color(0.7f, 0.73f, 0.78f), false);
+
+        var fpsButton = UiKit.TextButton(root, "FpsButton", profile.TargetFps + " FPS", V(0f, 1f), V(0f, 1f),
+            new Vector2(272f, -726f), new Vector2(150f, 52f), new Color(1f, 1f, 1f, 0.09f),
+            new Color(0.9f, 0.92f, 0.95f), 20, CycleFps);
+        _fpsText = fpsButton.GetComponentInChildren<Text>();
+
+        TopLabel("FpsHint", "越高越耗电；165 需要高刷屏", 18, TextAnchor.MiddleLeft, 440f, -726f, 420f, 52f,
+            new Color(0.5f, 0.53f, 0.58f), false);
+
+        // ---- 按键布局 ----
+        UiKit.TextButton(root, "LayoutButton", "按键布局", V(0f, 1f), V(0f, 1f), new Vector2(120f, -790f),
+            new Vector2(200f, 52f), new Color(1f, 1f, 1f, 0.06f), new Color(0.85f, 0.88f, 0.92f), 20,
+            () => LayoutEditor.Show(_app));
 
         // ---- 底部左 ----
         UiKit.TextButton(root, "ResetButton", "重置存档", V(0f, 0f), V(0f, 0f), new Vector2(120f, 26f),
@@ -359,6 +375,17 @@ public sealed class MenuUi : MonoBehaviour
     private static string FormatSensitivity(MetaProfile profile)
     {
         return (profile.Sensitivity / 0.13f).ToString("0.00") + "×";
+    }
+
+    private void CycleFps()
+    {
+        if (_app == null) return;
+
+        _app.Profile.TargetFps = MetaProfile.NextFps(_app.Profile.TargetFps);
+        _app.Profile.Save();
+        Application.targetFrameRate = Mathf.Clamp(_app.Profile.TargetFps, 30, 165);
+
+        if (_fpsText != null) _fpsText.text = _app.Profile.TargetFps + " FPS";
     }
 
     private void ChangeSensitivity(float delta)

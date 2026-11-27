@@ -15,7 +15,7 @@ public sealed class PlayerRig : MonoBehaviour
     private const float ReloadSeconds = 1.9f;
     private const float HealSeconds = 1.4f;
     private const float BaseFov = 75f;
-    private const float AimFov = 52f;
+    private const float AimFov = 46f;
 
     private const float StaminaDrain = 24f;
     private const float StaminaRegen = 17f;
@@ -180,6 +180,12 @@ public sealed class PlayerRig : MonoBehaviour
         if (_controls.ConsumeHeal())
         {
             StartHeal();
+        }
+
+        if (_controls.ConsumeBackpack())
+        {
+            if (BackpackUi.IsOpen) BackpackUi.Close();
+            else BackpackUi.Show(_app, this, _controls);
         }
     }
 

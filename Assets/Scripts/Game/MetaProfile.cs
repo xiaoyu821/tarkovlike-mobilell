@@ -16,7 +16,21 @@ public sealed class MetaProfile
     public int TotalLootValue;
     public float Sensitivity = 0.13f;
     public int SelectedKit = 1;
+    public int TargetFps = 60;
     public bool FirstRunDone;
+
+    /// <summary>可选帧率档位，最高 165（需要高刷屏才有意义）。</summary>
+    public static readonly int[] FpsPresets = { 30, 45, 60, 90, 120, 144, 165 };
+
+    public static int NextFps(int current)
+    {
+        for (var i = 0; i < FpsPresets.Length; i++)
+        {
+            if (FpsPresets[i] == current) return FpsPresets[(i + 1) % FpsPresets.Length];
+        }
+
+        return 60;
+    }
 
     public float ExtractRate => Raids <= 0 ? 0f : Extracts / (float)Raids;
 

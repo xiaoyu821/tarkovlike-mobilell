@@ -4,7 +4,8 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 触屏控制层：左半屏动态摇杆移动，右半屏拖动视角，
-/// 右下角开火/开镜/搜刮/换弹，左下角冲刺/治疗。全部用 uGUI 指针事件。
+/// 右下角开火/开镜/搜刮/换弹/背包，左下角冲刺/治疗。
+/// 按钮位置和大小可以在"按键布局"里拖拽调整，存到 TouchLayout。
 /// </summary>
 public sealed class TouchControls : MonoBehaviour
 {
@@ -20,6 +21,7 @@ public sealed class TouchControls : MonoBehaviour
     private TapButton _interact;
     private TapButton _heal;
     private TapButton _reload;
+    private TapButton _backpack;
     private bool _inputEnabled = true;
 
     public Vector2 Move => _inputEnabled && _joystick != null ? _joystick.Value : Vector2.zero;
@@ -29,10 +31,15 @@ public sealed class TouchControls : MonoBehaviour
 
     public static TouchControls Create()
     {
+        return Create(10, false);
+    }
+
+    public static TouchControls Create(int sortingOrder, bool editMode)
+    {
         var canvasGo = new GameObject("TouchControls", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         var canvas = canvasGo.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 10;
+        canvas.sortingOrder = sortingOrder;
 
         var scaler = canvasGo.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -42,7 +49,7 @@ public sealed class TouchControls : MonoBehaviour
         UiEventSystem.Ensure();
 
         var controls = canvasGo.AddComponent<TouchControls>();
-        controls.Build(canvasGo.transform);
+        controls.Build(canvasGo.transform, editMode);
         return controls;
     }
 
@@ -62,6 +69,7 @@ public sealed class TouchControls : MonoBehaviour
     public bool ConsumeInteract() => _inputEnabled && _interact != null && _interact.Consume();
     public bool ConsumeHeal() => _inputEnabled && _heal != null && _heal.Consume();
     public bool ConsumeReload() => _inputEnabled && _reload != null && _reload.Consume();
+    public bool ConsumeBackpack() => _inputEnabled && _backpack != null && _backpack.Consume();
 
     internal void AddLook(Vector2 delta)
     {
@@ -69,33 +77,41 @@ public sealed class TouchControls : MonoBehaviour
         _lookDelta += delta;
     }
 
-    private void Build(Transform root)
+    private void Build(Transform root, bool editMode)
     {
-        // 层级顺序决定点击优先级：后添加的在上层。
-        var lookArea = CreateArea("LookPad", root, new Vector2(0.42f, 0f), Vector2.one);
-        lookArea.gameObject.AddComponent<LookPad>().Owner = this;
+        if (!editMode)
+        {
+            // 层级顺序决定点击优先级：后添加的在上层。
+            var lookArea = CreateArea("LookPad", root, new Vector2(0.42f, 0f), Vector2.one);
+            lookArea.gameObject.AddComponent<LookPad>().Owner = this;
 
-        var moveArea = CreateArea("MovePad", root, Vector2.zero, new Vector2(0.42f, 1f));
-        _joystick = moveArea.gameObject.AddComponent<VirtualJoystick>();
-        _joystick.Initialize(moveArea, JoystickRadius, CircleSprite());
+            var moveArea = CreateArea("MovePad", root, Vector2.zero, new Vector2(0.42f, 1f));
+            _joystick = moveArea.gameObject.AddComponent<VirtualJoystick>();
+            _joystick.Initialize(moveArea, JoystickRadius, CircleSprite());
+        }
 
-        _fire = CreateButton<HoldButton>(root, "FireButton", "开火", new Vector2(1f, 0f),
-            new Vector2(-230f, 250f), 200f, new Color(0.85f, 0.2f, 0.2f, 0.5f));
+        var scale = TouchLayout.Scale;
 
-        _aim = CreateButton<HoldButton>(root, "AimButton", "镜", new Vector2(1f, 0f),
-            new Vector2(-230f, 480f), 140f, new Color(0.9f, 0.75f, 0.25f, 0.4f));
+        _fire = CreateButton<HoldButton>(root, "fire", "开火", new Vector2(1f, 0f),
+            new Vector2(-230f, 250f), 200f * scale, new Color(0.85f, 0.2f, 0.2f, 0.5f), editMode);
 
-        _interact = CreateButton<TapButton>(root, "SearchButton", "搜", new Vector2(1f, 0f),
-            new Vector2(-440f, 300f), 140f, new Color(0.2f, 0.6f, 0.9f, 0.45f));
+        _aim = CreateButton<HoldButton>(root, "aim", "镜", new Vector2(1f, 0f),
+            new Vector2(-230f, 480f), 140f * scale, new Color(0.9f, 0.75f, 0.25f, 0.4f), editMode);
 
-        _reload = CreateButton<TapButton>(root, "ReloadButton", "换", new Vector2(1f, 0f),
-            new Vector2(-440f, 510f), 130f, new Color(0.75f, 0.75f, 0.8f, 0.4f));
+        _interact = CreateButton<TapButton>(root, "search", "搜", new Vector2(1f, 0f),
+            new Vector2(-440f, 300f), 140f * scale, new Color(0.2f, 0.6f, 0.9f, 0.45f), editMode);
 
-        _sprint = CreateButton<HoldButton>(root, "SprintButton", "跑", new Vector2(0f, 0f),
-            new Vector2(150f, 150f), 130f, new Color(0.3f, 0.85f, 0.4f, 0.4f));
+        _reload = CreateButton<TapButton>(root, "reload", "换", new Vector2(1f, 0f),
+            new Vector2(-440f, 510f), 130f * scale, new Color(0.75f, 0.75f, 0.8f, 0.4f), editMode);
 
-        _heal = CreateButton<TapButton>(root, "HealButton", "医", new Vector2(0f, 0f),
-            new Vector2(150f, 330f), 130f, new Color(0.9f, 0.45f, 0.5f, 0.4f));
+        _backpack = CreateButton<TapButton>(root, "backpack", "包", new Vector2(1f, 0f),
+            new Vector2(-600f, 300f), 120f * scale, new Color(0.55f, 0.45f, 0.75f, 0.42f), editMode);
+
+        _sprint = CreateButton<HoldButton>(root, "sprint", "跑", new Vector2(0f, 0f),
+            new Vector2(150f, 150f), 130f * scale, new Color(0.3f, 0.85f, 0.4f, 0.4f), editMode);
+
+        _heal = CreateButton<TapButton>(root, "heal", "医", new Vector2(0f, 0f),
+            new Vector2(150f, 330f), 130f * scale, new Color(0.9f, 0.45f, 0.5f, 0.4f), editMode);
     }
 
     private static RectTransform CreateArea(string name, Transform root, Vector2 anchorMin, Vector2 anchorMax)
@@ -115,17 +131,17 @@ public sealed class TouchControls : MonoBehaviour
         return rect;
     }
 
-    private static T CreateButton<T>(Transform root, string name, string label,
-        Vector2 anchor, Vector2 anchoredPosition, float size, Color color) where T : MonoBehaviour
+    private static T CreateButton<T>(Transform root, string key, string label, Vector2 anchor,
+        Vector2 defaultPosition, float size, Color color, bool editMode) where T : MonoBehaviour
     {
-        var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+        var go = new GameObject("Btn_" + key, typeof(RectTransform), typeof(Image));
         var rect = (RectTransform)go.transform;
         rect.SetParent(root, false);
         rect.anchorMin = anchor;
         rect.anchorMax = anchor;
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.sizeDelta = new Vector2(size, size);
-        rect.anchoredPosition = anchoredPosition;
+        rect.anchoredPosition = TouchLayout.TryGet(key, out var saved) ? saved : defaultPosition;
 
         var image = go.GetComponent<Image>();
         image.sprite = CircleSprite();
@@ -147,6 +163,12 @@ public sealed class TouchControls : MonoBehaviour
         text.fontSize = Mathf.RoundToInt(size * 0.3f);
         text.color = new Color(1f, 1f, 1f, 0.9f);
         text.raycastTarget = false;
+
+        if (editMode)
+        {
+            var drag = go.AddComponent<DragMove>();
+            drag.Key = key;
+        }
 
         return go.AddComponent<T>();
     }

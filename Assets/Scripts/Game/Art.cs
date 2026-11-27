@@ -22,6 +22,7 @@ public static class Art
     private static Material _vest;
     private static Material _helmet;
     private static Material _beacon;
+    private static Material _pad;
     private static Material _black;
 
     public static Mesh CubeMesh => _cube != null ? _cube : (_cube = GrabMesh(PrimitiveType.Cube));
@@ -51,6 +52,18 @@ public static class Art
     public static Material Helmet => _helmet != null ? _helmet : (_helmet = Flat(new Color(0.24f, 0.26f, 0.22f), 0.35f));
     public static Material Black => _black != null ? _black : (_black = Flat(new Color(0.07f, 0.07f, 0.08f), 0.3f));
 
+    public static Material ExtractPad
+    {
+        get
+        {
+            if (_pad != null) return _pad;
+            _pad = Flat(new Color(0.14f, 0.34f, 0.2f), 0.15f);
+            _pad.EnableKeyword("_EMISSION");
+            _pad.SetColor("_EmissionColor", new Color(0.1f, 0.34f, 0.16f) * 0.7f);
+            return _pad;
+        }
+    }
+
     public static Material Beacon
     {
         get
@@ -58,7 +71,7 @@ public static class Art
             if (_beacon != null) return _beacon;
             _beacon = Flat(new Color(0.3f, 0.95f, 0.5f), 0.6f);
             _beacon.EnableKeyword("_EMISSION");
-            _beacon.SetColor("_EmissionColor", new Color(0.2f, 0.9f, 0.4f) * 1.6f);
+            _beacon.SetColor("_EmissionColor", new Color(0.2f, 0.9f, 0.4f) * 0.9f);
             return _beacon;
         }
     }

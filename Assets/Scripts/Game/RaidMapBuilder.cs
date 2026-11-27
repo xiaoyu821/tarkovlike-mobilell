@@ -104,7 +104,7 @@ public sealed class RaidMapBuilder
         Extractions.Add(zone);
 
         // 地面上的绿盘 + 四根柱子，远远就能认出来
-        AddBox(center + new Vector3(0f, 0.04f, 0f), new Vector3(9f, 0.08f, 9f), Art.Beacon, "ExtractPad");
+        AddBox(center + new Vector3(0f, 0.03f, 0f), new Vector3(7f, 0.06f, 7f), Art.ExtractPad, "ExtractPad");
         Art.BuildBeacon(StaticRoot, center);
         var corners = new[]
         {

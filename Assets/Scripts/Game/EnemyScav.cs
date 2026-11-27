@@ -45,7 +45,12 @@ public sealed class EnemyScav : MonoBehaviour
     private float _stuckCheckTime;
     private float _detourUntil;
     private float _nextStepSound;
-    private float _nextGeometryProbe;
+    private Transform _body;
+    private float _nextBodyAlign;
+    private float _stuckTime;
+    private Vector3 _lastProgressPosition;
+    private float _nextProgressCheck;
+    private bool _wantsToMove;
 
     public bool IsAlive => _state != AiState.Dead && _health > 0f;
     public Vector3 AimPoint => transform.position + Vector3.up * 1.15f;
@@ -68,10 +73,13 @@ public sealed class EnemyScav : MonoBehaviour
         // CharacterController 的 skinWidth 会让胶囊底离地 8cm，模型要往下补偿这么多，
         // 否则看起来就是"悬在地面上"。
         var body = Art.BuildSoldier(transform);
-        var skin = _controller != null ? _controller.skinWidth : 0.08f;
-        body.transform.localPosition = new Vector3(0f, -skin, 0f);
+        _body = body.transform;
+        _body.localPosition = Vector3.zero;
 
         _renderers = GetComponentsInChildren<Renderer>();
+
+        _lastProgressPosition = transform.position;
+        _nextProgressCheck = Time.time + 0.5f;
 
         SnapToGround();
     }
@@ -93,8 +101,9 @@ public sealed class EnemyScav : MonoBehaviour
         var dt = Mathf.Min(Time.deltaTime, 0.05f);
 
         // 重力每帧都生效（以前只在移动时才有，站着不动就悬在半空）
+        _wantsToMove = false;
         ApplyGravity(dt);
-        CheckStuckInGeometry();
+        AlignBodyToGround();
 
         var seesPlayer = CanSeePlayer(out var playerChest);
 
@@ -132,6 +141,8 @@ public sealed class EnemyScav : MonoBehaviour
                 UpdateEngage(dt, seesPlayer);
                 break;
         }
+
+        CheckProgress();
     }
 
     private bool CanSeePlayer(out Vector3 playerChest)
@@ -287,6 +298,8 @@ public sealed class EnemyScav : MonoBehaviour
 
         if (toTarget.sqrMagnitude < 0.05f) return;
 
+        _wantsToMove = toTarget.sqrMagnitude > 1f;
+
         var direction = toTarget.normalized;
 
         if (!faceTarget)
@@ -383,38 +396,66 @@ public sealed class EnemyScav : MonoBehaviour
     }
 
     /// <summary>
-    /// 真被挤进几何体里时（碰撞体互相推挤），抬到它顶上再落下来。
+    /// 让模型脚底始终贴着地面：CharacterController 的 skinWidth 会留一点缝，
+    /// 上坡下坡也会有偏差，所以每 0.2 秒按射线重新对一次，肉眼看不出悬空。
     /// </summary>
-    private void CheckStuckInGeometry()
+    private void AlignBodyToGround()
     {
-        if (Time.time < _nextGeometryProbe) return;
-        _nextGeometryProbe = Time.time + 0.5f;
+        if (_body == null || Time.time < _nextBodyAlign) return;
+        _nextBodyAlign = Time.time + 0.2f;
 
-        var bottom = transform.position + Vector3.up * 0.45f;
-        var top = transform.position + Vector3.up * 1.35f;
-        var overlaps = Physics.OverlapCapsule(bottom, top, 0.28f, ~0, QueryTriggerInteraction.Ignore);
-        if (overlaps.Length == 0) return;
+        var ground = Art.GroundY(transform.position);
+        var offset = Mathf.Clamp(ground - transform.position.y, -0.8f, 0.8f);
+        _body.localPosition = new Vector3(0f, offset, 0f);
+    }
 
-        var chest = transform.position + Vector3.up * 0.9f;
+    /// <summary>
+    /// 想走却原地不动超过 1.5 秒 = 真卡住了，找一个附近的空地重新落位。
+    /// 之前是"只要碰到墙就抬到墙顶"，结果敌人被弹到 3.4 米高的墙顶再掉下来，
+    /// 看起来就像一群人在天上飘。
+    /// </summary>
+    private void CheckProgress()
+    {
+        if (Time.time < _nextProgressCheck) return;
+        _nextProgressCheck = Time.time + 0.5f;
 
-        for (var i = 0; i < overlaps.Length; i++)
+        var moved = (transform.position - _lastProgressPosition).sqrMagnitude;
+        _lastProgressPosition = transform.position;
+
+        if (!_wantsToMove || moved > 0.04f)
         {
-            var collider = overlaps[i];
-            if (collider == null) continue;
-            if (collider == _controller) continue;
-            if (collider.GetComponentInParent<EnemyScav>() != null) continue;
-            if (collider.GetComponentInParent<PlayerRig>() != null) continue;
-            if (!collider.bounds.Contains(chest)) continue;
+            _stuckTime = 0f;
+            return;
+        }
 
-            var position = transform.position;
-            position.y = collider.bounds.max.y + 0.3f;
+        _stuckTime += 0.5f;
+        if (_stuckTime < 1.5f) return;
+
+        _stuckTime = 0f;
+        RelocateToOpenSpace();
+    }
+
+    private void RelocateToOpenSpace()
+    {
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            var angle = Random.value * Mathf.PI * 2f;
+            var distance = Random.Range(3f, 8f);
+            var candidate = transform.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
+            candidate.y = Art.GroundY(candidate);
+
+            if (Physics.CheckCapsule(candidate + Vector3.up * 0.45f, candidate + Vector3.up * 1.35f, 0.4f,
+                    ~0, QueryTriggerInteraction.Ignore))
+            {
+                continue;
+            }
 
             if (_controller != null) _controller.enabled = false;
-            transform.position = position;
+            transform.position = candidate;
             if (_controller != null) _controller.enabled = true;
             Physics.SyncTransforms();
 
-            _stuckPosition = position;
+            _lastProgressPosition = candidate;
             return;
         }
     }

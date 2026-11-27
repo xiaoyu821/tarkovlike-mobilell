@@ -51,11 +51,13 @@ public sealed class GameApp : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        Application.targetFrameRate = 60;
         QualitySettings.vSyncCount = 0;
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
+        // 先读档再设帧率，否则读档里的设置要等下一局才生效
         Profile = MetaProfile.Load();
+        Application.targetFrameRate = Mathf.Clamp(Profile.TargetFps, 30, 165);
+
         Fx.EnsureLoaded();
     }
 
@@ -82,6 +84,8 @@ public sealed class GameApp : MonoBehaviour
     public void ShowMenu()
     {
         MenuUi.Close();
+        BackpackUi.Close();
+        Time.timeScale = 1f;
         DestroyRaid();
 
         InRaid = false;
@@ -96,6 +100,9 @@ public sealed class GameApp : MonoBehaviour
     public void StartRaid()
     {
         MenuUi.Close();
+        BackpackUi.Close();
+        Time.timeScale = 1f;
+        Application.targetFrameRate = Mathf.Clamp(Profile.TargetFps, 30, 165);
         DestroyRaid();
 
         Kills = 0;
@@ -305,6 +312,8 @@ public sealed class GameApp : MonoBehaviour
 
     private void DestroyRaid()
     {
+        BackpackUi.Close();
+
         if (Hud != null)
         {
             Destroy(Hud);

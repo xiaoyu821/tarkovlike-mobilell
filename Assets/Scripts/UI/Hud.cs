@@ -256,8 +256,20 @@ public sealed class Hud : MonoBehaviour
 
         var cx = width * 0.5f;
         var cy = height * 0.5f;
-        var gap = height * 0.012f;
-        var length = height * 0.012f;
+
+        // 开镜：四周压暗，准星收紧，模拟"举枪贴脸"的聚焦感
+        if (player.Aiming)
+        {
+            GUI.color = new Color(0f, 0f, 0f, 0.42f);
+            GUI.DrawTexture(new Rect(0f, 0f, width * 0.17f, height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(width * 0.83f, 0f, width * 0.17f, height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(0f, 0f, width, height * 0.075f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(0f, height * 0.925f, width, height * 0.075f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+        }
+
+        var gap = player.Aiming ? height * 0.005f : height * 0.012f;
+        var length = player.Aiming ? height * 0.007f : height * 0.012f;
         var thickness = Mathf.Max(2f, height * 0.0022f);
 
         GUI.color = new Color(1f, 1f, 1f, 0.8f);
