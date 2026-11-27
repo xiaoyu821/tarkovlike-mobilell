@@ -46,6 +46,8 @@ public sealed class EnemyScav : MonoBehaviour
     private float _detourUntil;
     private float _nextStepSound;
     private Transform _body;
+    private SoldierRig _rig;
+    private Vector3 _lastAnimPosition;
     private float _nextBodyAlign;
     private float _stuckTime;
     private Vector3 _lastProgressPosition;
@@ -75,6 +77,8 @@ public sealed class EnemyScav : MonoBehaviour
         var body = Art.BuildSoldier(transform);
         _body = body.transform;
         _body.localPosition = Vector3.zero;
+        _rig = body.GetComponent<SoldierRig>();
+        _lastAnimPosition = transform.position;
 
         _renderers = GetComponentsInChildren<Renderer>();
 
@@ -96,7 +100,14 @@ public sealed class EnemyScav : MonoBehaviour
 
     private void Update()
     {
-        if (_state == AiState.Dead || _app == null) return;
+        if (_state == AiState.Dead)
+        {
+            // 死了也要继续跑倒地动画
+            if (_rig != null) _rig.Tick(Mathf.Min(Time.deltaTime, 0.05f), 0f, false);
+            return;
+        }
+
+        if (_app == null) return;
 
         var dt = Mathf.Min(Time.deltaTime, 0.05f);
 
@@ -142,7 +153,40 @@ public sealed class EnemyScav : MonoBehaviour
                 break;
         }
 
+        DriveAnimation(dt, seesPlayer);
         CheckProgress();
+    }
+
+    /// <summary>把移动速度、是否交战喂给骨架：走路摆腿、举枪、转头看人。</summary>
+    private void DriveAnimation(float dt, bool seesPlayer)
+    {
+        if (_rig == null) return;
+
+        var delta = transform.position - _lastAnimPosition;
+        delta.y = 0f;
+        _lastAnimPosition = transform.position;
+
+        var speed = delta.magnitude / Mathf.Max(dt, 0.0001f);
+        var speed01 = Mathf.Clamp01(speed / 3.2f);
+        var aiming = _state == AiState.Engage && seesPlayer;
+
+        _rig.Tick(dt, speed01, aiming);
+
+        if (aiming && _app != null)
+        {
+            var toPlayer = _app.PlayerPosition - transform.position;
+            toPlayer.y = 0f;
+
+            if (toPlayer.sqrMagnitude > 0.01f)
+            {
+                var local = transform.InverseTransformDirection(toPlayer.normalized);
+                _rig.SetHeadYaw(Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg);
+            }
+        }
+        else
+        {
+            _rig.SetHeadYaw(0f);
+        }
     }
 
     private bool CanSeePlayer(out Vector3 playerChest)
@@ -401,7 +445,7 @@ public sealed class EnemyScav : MonoBehaviour
     /// </summary>
     private void AlignBodyToGround()
     {
-        if (_body == null || Time.time < _nextBodyAlign) return;
+        if (_body == null || (_rig != null && _rig.Dead) || Time.time < _nextBodyAlign) return;
         _nextBodyAlign = Time.time + 0.2f;
 
         var ground = Art.GroundY(transform.position);
@@ -511,6 +555,7 @@ public sealed class EnemyScav : MonoBehaviour
         _health -= amount;
 
         Fx.PlayAt(transform.position + Vector3.up * 1.2f, Fx.HitFlesh, 0.45f);
+        if (_rig != null) _rig.Flinch(0.9f);
 
         // 被打了一定会警觉，哪怕没看见
         if (_app != null && _app.PlayerAlive)
@@ -540,13 +585,8 @@ public sealed class EnemyScav : MonoBehaviour
         var collider = GetComponent<Collider>();
         if (collider != null) collider.enabled = false;
 
-        if (_renderers != null)
-        {
-            for (var i = 0; i < _renderers.Length; i++)
-            {
-                if (_renderers[i] != null) _renderers[i].enabled = false;
-            }
-        }
+        // 保留渲染：尸体躺在地上比瞬间消失自然得多
+        if (_rig != null) _rig.Die();
 
         Fx.PlayAt(transform.position, Fx.Death, 0.45f);
 

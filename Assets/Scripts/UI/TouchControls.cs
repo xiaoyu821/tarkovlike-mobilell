@@ -16,7 +16,7 @@ public sealed class TouchControls : MonoBehaviour
     private Vector2 _lookDelta;
     private VirtualJoystick _joystick;
     private HoldButton _fire;
-    private HoldButton _aim;
+    private AimButton _aim;
     private HoldButton _sprint;
     private TapButton _interact;
     private TapButton _heal;
@@ -96,8 +96,9 @@ public sealed class TouchControls : MonoBehaviour
         _fire = CreateButton<HoldButton>(root, "fire", "开火", new Vector2(1f, 0f),
             new Vector2(-230f, 250f), 200f * scale, new Color(0.85f, 0.2f, 0.2f, 0.5f), editMode);
 
-        _aim = CreateButton<HoldButton>(root, "aim", "镜", new Vector2(1f, 0f),
+        _aim = CreateButton<AimButton>(root, "aim", "镜", new Vector2(1f, 0f),
             new Vector2(-230f, 480f), 140f * scale, new Color(0.9f, 0.75f, 0.25f, 0.4f), editMode);
+        _aim.Owner = this;
 
         _interact = CreateButton<TapButton>(root, "search", "搜", new Vector2(1f, 0f),
             new Vector2(-440f, 300f), 140f * scale, new Color(0.2f, 0.6f, 0.9f, 0.45f), editMode);
@@ -322,6 +323,42 @@ public sealed class TouchControls : MonoBehaviour
         public void OnPointerUp(PointerEventData eventData)
         {
             Held = false;
+        }
+    }
+
+    /// <summary>
+    /// 开镜键。除了按住开镜，按住后拖动还能直接转视角 ——
+    /// 右手拇指按住镜就能一边瞄一边跟枪，不用再腾第三根手指。
+    /// </summary>
+    private sealed class AimButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler
+    {
+        public TouchControls Owner;
+
+        private bool _pressed;
+
+        public bool Held { get; private set; }
+
+        public bool ConsumePress()
+        {
+            var value = _pressed;
+            _pressed = false;
+            return value;
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            Held = true;
+            _pressed = true;
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            Held = false;
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (Owner != null) Owner.AddLook(eventData.delta);
         }
     }
 

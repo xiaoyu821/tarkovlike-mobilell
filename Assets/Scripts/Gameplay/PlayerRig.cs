@@ -55,6 +55,7 @@ public sealed class PlayerRig : MonoBehaviour
     private float _healEndTime;
 
     private float _stamina = 1f;
+    private float _bobTime;
     private bool _sprinting;
 
     private float _nextFireTime;
@@ -411,12 +412,31 @@ public sealed class PlayerRig : MonoBehaviour
             Respawn();
         }
 
+        UpdateCameraBob(dt, magnitude);
+
         // 脚步声
         if (_controller.isGrounded && magnitude > 0.15f && Time.time >= _nextStepSound)
         {
             _nextStepSound = Time.time + (_sprinting ? 0.31f : 0.45f);
             Fx.Play2D(Fx.Step, _sprinting ? 0.3f : 0.18f);
         }
+    }
+
+    /// <summary>走路/冲刺时镜头轻微上下起伏，脚步感和步兵重量感全靠这个。</summary>
+    private void UpdateCameraBob(float dt, float moveAmount)
+    {
+        if (_camera == null) return;
+
+        var amount = _sprinting ? 0.05f : 0.022f;
+        var active = _controller.isGrounded ? moveAmount : 0f;
+
+        _bobTime += dt * (_sprinting ? 12f : 8.5f) * active;
+
+        var y = Mathf.Abs(Mathf.Sin(_bobTime)) * amount * active;
+        var x = Mathf.Sin(_bobTime * 0.5f) * amount * 0.55f * active;
+
+        _camera.localPosition = Vector3.Lerp(_camera.localPosition,
+            new Vector3(x, 1.62f + y, 0f), 14f * dt);
     }
 
     private void SnapToGround()

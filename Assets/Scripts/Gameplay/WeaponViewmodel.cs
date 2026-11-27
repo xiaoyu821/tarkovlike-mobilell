@@ -21,6 +21,8 @@ public sealed class WeaponViewmodel : MonoBehaviour
     private float _bobTime;
     private float _kick;
     private float _reloadDip;
+    private Transform _magazine;
+    private Vector3 _magazineBase;
     private float _moveAmount;
     private ViewmodelHideOnAim[] _hideOnAim = new ViewmodelHideOnAim[0];
     private bool _hiddenApplied;
@@ -57,6 +59,13 @@ public sealed class WeaponViewmodel : MonoBehaviour
         if (sight != null) _aimPosition = new Vector3(0f, -sight.Height, 0.32f);
 
         _hideOnAim = model.GetComponentsInChildren<ViewmodelHideOnAim>(true);
+
+        var magazine = model.transform.Find("Magazine");
+        if (magazine != null)
+        {
+            _magazine = magazine;
+            _magazineBase = magazine.localPosition;
+        }
 
         // 枪不能投影：0.4 米外的模型打阴影会在屏幕上糊一片
         var renderers = model.GetComponentsInChildren<MeshRenderer>();
@@ -115,6 +124,13 @@ public sealed class WeaponViewmodel : MonoBehaviour
         var follow = _aiming ? 15f : 9f;
         _current = Vector3.Lerp(_current, target + new Vector3(bobX + swayX, bobY + swayY, 0f), follow * dt);
         transform.localPosition = _current;
+
+        // 换弹：弹匣先抽出来再顶回去
+        if (_magazine != null)
+        {
+            var drop = Mathf.Sin(Mathf.Clamp01(_reloadDip) * Mathf.PI);
+            _magazine.localPosition = _magazineBase + new Vector3(0f, -0.20f * drop, -0.02f * drop);
+        }
 
         // 开镜时把枪托收起来，不然会顶到镜头前挡视线
         if (_aiming != _hiddenApplied)

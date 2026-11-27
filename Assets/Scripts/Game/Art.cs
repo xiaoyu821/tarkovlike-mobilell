@@ -300,7 +300,10 @@ public static class Art
 
     // ---------- Scav 士兵 ----------
 
-    /// <summary>方块拼的士兵，脚底在 y=0，总高约 1.8（和 CharacterController 对齐）。</summary>
+    /// <summary>
+    /// 方块拼的士兵，脚底在 y=0，总高约 1.7。
+    /// 髋/肩/颈/枪各有一个枢轴，动作由 SoldierRig 用旋转插值驱动。
+    /// </summary>
     public static GameObject BuildSoldier(Transform parent)
     {
         var root = new GameObject("Body");
@@ -309,32 +312,58 @@ public static class Art
         root.transform.localRotation = Quaternion.identity;
         root.transform.localScale = Vector3.one;
 
-        // 腿
-        Box(root.transform, "LegL", new Vector3(-0.11f, 0.38f, 0f), new Vector3(0.15f, 0.76f, 0.17f), Uniform);
-        Box(root.transform, "LegR", new Vector3(0.11f, 0.38f, 0f), new Vector3(0.15f, 0.76f, 0.17f), Uniform);
-        // 靴子
-        Box(root.transform, "BootL", new Vector3(-0.11f, 0.05f, 0.03f), new Vector3(0.17f, 0.1f, 0.24f), Black);
-        Box(root.transform, "BootR", new Vector3(0.11f, 0.05f, 0.03f), new Vector3(0.17f, 0.1f, 0.24f), Black);
-        // 躯干 + 战术背心
-        Box(root.transform, "Torso", new Vector3(0f, 1.02f, 0f), new Vector3(0.36f, 0.55f, 0.22f), Uniform);
-        Box(root.transform, "Vest", new Vector3(0f, 1.04f, 0f), new Vector3(0.40f, 0.42f, 0.26f), Vest);
-        // 背包
-        Box(root.transform, "Pack", new Vector3(0f, 1.02f, -0.19f), new Vector3(0.30f, 0.36f, 0.14f), Vest);
-        // 手臂
-        Box(root.transform, "ArmL", new Vector3(-0.235f, 1.0f, 0.04f), new Vector3(0.12f, 0.46f, 0.13f),
-            Uniform, new Vector3(-24f, 0f, 0f));
-        Box(root.transform, "ArmR", new Vector3(0.235f, 1.0f, 0.04f), new Vector3(0.12f, 0.46f, 0.13f),
-            Uniform, new Vector3(-24f, 0f, 0f));
-        // 头 + 头盔
-        Box(root.transform, "Head", new Vector3(0f, 1.42f, 0f), new Vector3(0.19f, 0.21f, 0.19f), Skin);
-        Box(root.transform, "Helmet", new Vector3(0f, 1.53f, -0.005f), new Vector3(0.24f, 0.13f, 0.24f), Helmet);
-        Box(root.transform, "Visor", new Vector3(0f, 1.44f, 0.10f), new Vector3(0.16f, 0.07f, 0.03f), Black);
-        // 手里的枪
-        Box(root.transform, "Gun", new Vector3(0.16f, 1.02f, 0.30f), new Vector3(0.05f, 0.07f, 0.55f), GunMetal);
-        Box(root.transform, "GunMag", new Vector3(0.16f, 0.94f, 0.26f), new Vector3(0.04f, 0.14f, 0.06f), GunPolymer);
-        Box(root.transform, "GunStock", new Vector3(0.16f, 1.0f, 0.02f), new Vector3(0.045f, 0.06f, 0.16f), GunPolymer);
+        // 腿：枢轴在髋部 (y=0.88)
+        var hipL = Pivot(root.transform, "HipL", new Vector3(-0.11f, 0.88f, 0f));
+        Box(hipL, "LegL", new Vector3(0f, -0.42f, 0f), new Vector3(0.15f, 0.80f, 0.17f), Uniform);
+        Box(hipL, "BootL", new Vector3(0f, -0.83f, 0.04f), new Vector3(0.16f, 0.10f, 0.24f), Black);
+
+        var hipR = Pivot(root.transform, "HipR", new Vector3(0.11f, 0.88f, 0f));
+        Box(hipR, "LegR", new Vector3(0f, -0.42f, 0f), new Vector3(0.15f, 0.80f, 0.17f), Uniform);
+        Box(hipR, "BootR", new Vector3(0f, -0.83f, 0.04f), new Vector3(0.16f, 0.10f, 0.24f), Black);
+
+        // 躯干（枢轴在中线，方便整体起伏/后仰）
+        var torso = Pivot(root.transform, "TorsoPivot", new Vector3(0f, 0.88f, 0f));
+        Box(torso, "Torso", new Vector3(0f, 0.22f, 0f), new Vector3(0.36f, 0.52f, 0.22f), Uniform);
+        Box(torso, "Vest", new Vector3(0f, 0.24f, 0f), new Vector3(0.40f, 0.40f, 0.26f), Vest);
+        Box(torso, "Pack", new Vector3(0f, 0.22f, -0.19f), new Vector3(0.30f, 0.36f, 0.14f), Vest);
+        Box(torso, "Belt", new Vector3(0f, 0.02f, 0f), new Vector3(0.38f, 0.06f, 0.24f), Black);
+
+        // 颈/头
+        var head = Pivot(root.transform, "HeadPivot", new Vector3(0f, 1.40f, 0f));
+        Box(head, "Head", new Vector3(0f, 0.09f, 0f), new Vector3(0.19f, 0.21f, 0.19f), Skin);
+        Box(head, "Helmet", new Vector3(0f, 0.19f, -0.005f), new Vector3(0.24f, 0.13f, 0.24f), Helmet);
+        Box(head, "Visor", new Vector3(0f, 0.10f, 0.10f), new Vector3(0.16f, 0.07f, 0.03f), Black);
+
+        // 肩
+        var shoulderL = Pivot(root.transform, "ShoulderL", new Vector3(-0.235f, 1.24f, 0f));
+        Box(shoulderL, "ArmL", new Vector3(0f, -0.24f, 0f), new Vector3(0.12f, 0.46f, 0.13f), Uniform);
+        Box(shoulderL, "HandL", new Vector3(0f, -0.48f, 0f), new Vector3(0.10f, 0.09f, 0.11f), Skin);
+
+        var shoulderR = Pivot(root.transform, "ShoulderR", new Vector3(0.235f, 1.24f, 0f));
+        Box(shoulderR, "ArmR", new Vector3(0f, -0.24f, 0f), new Vector3(0.12f, 0.46f, 0.13f), Uniform);
+        Box(shoulderR, "HandR", new Vector3(0f, -0.48f, 0f), new Vector3(0.10f, 0.09f, 0.11f), Skin);
+
+        // 枪挂在右手上，开镜时随手臂抬起
+        var gun = Pivot(shoulderR, "GunPivot", new Vector3(0f, -0.46f, 0.02f));
+        Box(gun, "Gun", new Vector3(0f, 0.02f, 0.24f), new Vector3(0.05f, 0.07f, 0.50f), GunMetal);
+        Box(gun, "GunMag", new Vector3(0f, -0.06f, 0.14f), new Vector3(0.04f, 0.14f, 0.06f), GunPolymer);
+        Box(gun, "GunStock", new Vector3(0f, 0f, -0.02f), new Vector3(0.045f, 0.06f, 0.18f), GunPolymer);
+        Box(gun, "GunBarrel", new Vector3(0f, 0.03f, 0.52f), new Vector3(0.025f, 0.025f, 0.14f), Black);
+
+        var rig = root.AddComponent<SoldierRig>();
+        rig.Bind(hipL, hipR, shoulderL, shoulderR, torso, head, gun);
 
         return root;
+    }
+
+    private static Transform Pivot(Transform parent, string name, Vector3 localPosition)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = localPosition;
+        go.transform.localRotation = Quaternion.identity;
+        go.transform.localScale = Vector3.one;
+        return go.transform;
     }
 
     // ---------- 箱子 ----------
