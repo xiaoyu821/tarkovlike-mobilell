@@ -54,7 +54,6 @@ public sealed class EnemyScav : MonoBehaviour
         _app = app;
         _health = Mathf.Max(1, health);
         _damage = Mathf.Max(1f, damage);
-        _baseColor = color;
         _home = transform.position;
         _moveTarget = _home;
         _nextRepathTime = 0f;
